@@ -3,6 +3,8 @@ import os, pathlib, regex, sys
 import torch, torch.nn as nn, torch.nn.functional as F
 import transformers
 
+# Note: the xent_ prefixed function are eventually to be in a separate file
+
 ##############
 # HOW TO RUN #
 ##############
