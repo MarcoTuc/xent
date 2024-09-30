@@ -9,17 +9,11 @@ from templates import templates
 
 
 # gpt2 to evaluate cross-entropy and train
-device = torch.device("cuda:3")
+device = torch.device("cuda:1")
 
 # wikipedia database
 database = load_dataset("wikipedia", "20220301.en", trust_remote_code=True)["train"]
 num_articles = len(database)
-
-
-def redblue(y: tuple, red, blue):
-    o = y[0]
-    c = y[1]
-    return f"@#@#@xent_redblue~(~[{o}><{c}]~><{red}><{blue})~:>:>:"
 
 class XentLang:
     
@@ -39,7 +33,6 @@ class XentLang:
         ",": comma,
         ":": xreturn,
         "def": xdef,
-        " ": ""
     }
 
     def map(self, function: str):
@@ -49,7 +42,6 @@ class XentLang:
     
     def invmap(self, text: str):
         mapper  = {v: k for k, v in self.mapper.items()}
-        mapper.pop("")
         for s in mapper.items():
             text = text.replace(*s)
         return text

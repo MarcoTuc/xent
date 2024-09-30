@@ -18,7 +18,7 @@ from transformers import AdamW, get_linear_schedule_with_warmup
 
 from generate import generate_dataset, save_dataset
 
-device = torch.device("cuda:3")
+device = torch.device("cuda:1")
 models_path = os.path.join(work_dir, "models")
 data_path = os.path.join(work_dir, "data")
 
@@ -33,12 +33,12 @@ def load_model(path: str):
     model = AutoModelForCausalLM.from_pretrained(path).to(device)
     return model
 
-path = "models/gpt2-xl-M0"
-M0, tokenizer = load_model_and_tokenizer(path)
+# path = "models/gpt2-xl-M0"
+# M0, tokenizer = load_model_and_tokenizer(path)
 
-# GENERATE THE DATASET
+# # GENERATE THE DATASET
 # era = 0
-# D0 = generate_dataset(2000)
+# D0 = generate_dataset(M0, tokenizer, 2000)
 # save_dataset(f"{data_path}/D{era}.pkl", D0)
 
 # # LOAD THE DATASET
