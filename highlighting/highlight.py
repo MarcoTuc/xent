@@ -5,11 +5,7 @@ import torch
 import torch.nn.functional as F
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from datasets import load_dataset
-from templates import templates
-
-
-# gpt2 to evaluate cross-entropy and train
-device = torch.device("cuda:1")
+from config import templates, device
 
 # wikipedia database
 database = load_dataset("wikipedia", "20220301.en", trust_remote_code=True)["train"]
@@ -36,9 +32,13 @@ class XentLang:
     }
 
     def map(self, function: str):
-        for s in self.mapper.items():
-            function = function.replace(*s)
-        return function
+        parts = function.split("~~~")
+        for i, part in enumerate(parts):
+            if i % 2 == 0:
+                for s in self.mapper.items():
+                    part = part.replace(*s)
+                parts[i] = part
+        return "".join(parts)
     
     def invmap(self, text: str):
         mapper  = {v: k for k, v in self.mapper.items()}
@@ -47,7 +47,8 @@ class XentLang:
         return text
 
     def redblue(self, y: tuple, red, blue):
-        return self.map(f"def red-blue([{y[0]}, {y[1]}], {red}, {blue}):")
+        """ You need to encapsulate f-string arguments via triple tilde ~~~ """
+        return self.map(f"def red-blue([~~~{y[0]}~~~, ~~~{y[1]}~~~], ~~~{red}~~~, ~~~{blue}~~~):")
    
 
 class HilightWiki:

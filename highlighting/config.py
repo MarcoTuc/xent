@@ -1,3 +1,7 @@
+import torch
+
+device = torch.device("cuda:1")
+
 templates =  [f"{t}\n" for t in [
     "This is what I mean when I talk about {}.",
     "{} is a pretty good title for this.",

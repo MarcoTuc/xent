@@ -17,19 +17,21 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 from transformers import AdamW, get_linear_schedule_with_warmup
 
 from generate import generate_dataset, save_dataset
+from config import device
 
-device = torch.device("cuda:1")
 models_path = os.path.join(work_dir, "models")
 data_path = os.path.join(work_dir, "data")
 
 
 # LOAD THE MODEL 
-def load_model_and_tokenizer(path: str):
+def load_model_and_tokenizer(name: str):
+    path = os.path.join(models_path, name)
     model = AutoModelForCausalLM.from_pretrained(path).to(device)
     tokenizer = AutoTokenizer.from_pretrained(path, clean_up_tokenization_spaces=True)
     return model, tokenizer
 
-def load_model(path: str):
+def load_model(name: str):
+    path = os.path.join(models_path, name)
     model = AutoModelForCausalLM.from_pretrained(path).to(device)
     return model
 
