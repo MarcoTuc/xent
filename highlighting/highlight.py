@@ -11,45 +11,6 @@ from config import templates, device
 database = load_dataset("wikipedia", "20220301.en", trust_remote_code=True)["train"]
 num_articles = len(database)
 
-class XentLang:
-    
-    xdef = "@##$$##@"
-    pot = "(("
-    pct = "))"
-    poq = "[["
-    pcq = "]]"
-    comma  = "><"
-    xreturn = ">:ç%ç>:"
-
-    mapper = {
-        "(": pot,
-        ")": pct,
-        "[": poq,
-        "]": pcq,
-        ",": comma,
-        ":": xreturn,
-        "def": xdef,
-    }
-
-    def map(self, function: str):
-        parts = function.split("~~~")
-        for i, part in enumerate(parts):
-            if i % 2 == 0:
-                for s in self.mapper.items():
-                    part = part.replace(*s)
-                parts[i] = part
-        return "".join(parts)
-    
-    def invmap(self, text: str):
-        mapper  = {v: k for k, v in self.mapper.items()}
-        for s in mapper.items():
-            text = text.replace(*s)
-        return text
-
-    def redblue(self, y: tuple, red, blue):
-        """ You need to encapsulate f-string arguments via triple tilde ~~~ """
-        return self.map(f"def red-blue([~~~{y[0]}~~~, ~~~{y[1]}~~~], ~~~{red}~~~, ~~~{blue}~~~):")
-   
 
 class HilightWiki:
 

@@ -36,7 +36,7 @@ cut_dataset = None
 
 # Hyperparameters
 LEARNING_RATE = 6e-4 # take it from Karpathy nano-GPT 
-EPOCHS = 15
+EPOCHS = 1
 # TODO add all the available hyperparameters
 data_split = 0.6 # train/test ratio
 
@@ -121,15 +121,16 @@ if cut_dataset:
 train_size = int(data_split * len(D0))
 test_size = len(D0) - train_size
 
-train_dataset, test_dataset = random_split(D0, [train_size, test_size])
+train_dataset, test_dataset = D0[:train_size], D0[train_size:]
 print("Tokenizing training set:")
+# train_dataset = train_dataset[1166]
 train_dataset = TextDataset(train_dataset, tokenizer)
-print("Tokenizing test set:")
-test_dataset = TextDataset(test_dataset, tokenizer)
+# print("Tokenizing test set:")
+# test_dataset = TextDataset(test_dataset, tokenizer)
 
 batch_size = 1
-train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=True)
+train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=False)
+# test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
 
 crossentropy = CrossEntropyLoss()
 optimizer = AdamW(M0.parameters(), lr = LEARNING_RATE, betas=(beta1, beta2), eps=1e-9, weight_decay=0.01)
@@ -141,65 +142,80 @@ scheduler = LambdaLR(optimizer, lr_lambda=lr_lambda, verbose=True)
 loss_series = []
 val_series = []
 log_interval = 10
+# prev_tokens = None
 
 def train(model):
-    model.train()
-    total_loss = 0
-    start_time = time.time()
+    # model.train()
+    # total_loss = 0
+    # start_time = time.time()
     for batch, tokens in enumerate(train_loader):
-        optimizer.zero_grad()
-        try: xidx = find_xent_def(tokens)[2]
-        except Exception as e: 
-            print(f"Incurred in find_xent_def error: {e}")
-            print("Couldn't retrieve xidx: this is the returned value of the function:")
-            print(xidx)
-            print("The tokens tensor had this shape")
+        # optimizer.zero_grad()
+        try: 
+            xidx = find_xent_def(tokens)[2]
+            # print(f"xidx at batch {batch} successful")
+            # print(f"Tokens shape: {tokens.shape}\n--------------------------")
+            # prev_tokens = tokens
+        except Exception as e:
+            # print(f"batch {batch} failed") 
+            print(f"Incurred in find_xent_def error at batch {batch}: {e}")
+            print(find_xent_def(tokens))
+            print(tokens)
+            # print(find_xent_def(prev_tokens))
+            # print(prev_tokens)
             print(tokens.input_ids.shape)
-            print("And these are the tokens we fed it:")
-            print(tokens.input_ids)
+            print(tokenizer.decode(tokens.input_ids[0][0]))
+            print("\n-------------------------------------------\n")
+            # print(find_xent_def(prev_tokens))
+            # print("Couldn't retrieve xidx: this is the returned value of the function:")
+            # print(xidx)
+            # print("The tokens tensor had this shape")
+            # print(tokens.input_ids.shape)
+            # print("And these are the tokens we fed it:")
+            # print(tokens.input_ids)
+            # print("---------------------------------------------")
             continue
-        tokens, attn_mask = tokens.input_ids.view(1, -1), tokens.attention_mask.view(1, -1) # [B, T]
-        logits = model(input_ids=tokens, attention_mask=attn_mask).logits  # [B, T, L]
+        # tokens, attn_mask = tokens.input_ids.view(1, -1), tokens.attention_mask.view(1, -1) # [B, T]
+        # logits = model(input_ids=tokens, attention_mask=attn_mask).logits  # [B, T, L]
         # loss = crossentropy(logits[:, xidx:][:-1], tokens[:, xidx:][1:]) # old loss but it's still doing the right thing
-        loss = crossentropy(logits[:, xidx:-1].view(-1, logits.shape[-1]), tokens[:, xidx+1:].view(-1))
-        loss.backward()
-        torch.nn.utils.clip_grad_norm_(model.parameters(), grad_clip)
-        optimizer.step()
-        total_loss += loss.item() 
-        if (batch + 1) % log_interval == 0 and batch > 0:
-            cur_loss = total_loss / log_interval
-            loss_series.append(float(cur_loss))
-            elapsed = time.time() - start_time
-            print(f"| batch: {batch+1} | loss: {cur_loss:.5f} | has taken: {elapsed:.2f} seconds")
-            total_loss = 0
-            start_time = time.time()
+        # loss = crossentropy(logits[:, xidx:-1].view(-1, logits.shape[-1]), tokens[:, xidx+1:].view(-1))
+        # loss.backward()
+        # torch.nn.utils.clip_grad_norm_(model.parameters(), grad_clip)
+        # optimizer.step()
+        # total_loss += loss.item() 
+        # if (batch + 1) % log_interval == 0 and batch > 0:
+            # cur_loss = total_loss / log_interval
+            # loss_series.append(float(cur_loss))
+            # elapsed = time.time() - start_time
+            # print(f"| batch: {batch+1} | loss: {cur_loss:.5f} | has taken: {elapsed:.2f} seconds")
+            # total_loss = 0
+            # start_time = time.time()
 
 
-def evaluate(test_model, test_loader):
-    test_model.eval()
-    total_val_loss = 0
-    nbatches = min(100, test_size)
-    print(f"number of evaluation batches: {nbatches}")
-    with torch.no_grad():
-        for batch, tokens in enumerate(test_loader):
-            try: xidx = find_xent_def(tokens)[2]
-            except Exception as e: 
-                print(f"Incurred in find_xent_def error: {e}")
-                print("Couldn't retrieve xidx: this is the returned value of the function:")
-                print(xidx)
-                print("The tokens tensor had this shape")
-                print(tokens.input_ids.shape)
-                print("And these are the tokens we fed it:")
-                print(tokens.input_ids)
-                continue
-            tokens, attn_mask = tokens.input_ids.view(1, -1), tokens.attention_mask.view(1, -1)
-            logits = test_model(input_ids=tokens, attention_mask=attn_mask).logits
-            loss = crossentropy(logits[0, xidx:-1].view(-1, logits.shape[-1]), tokens[0, xidx+1:].view(-1))
-            total_val_loss += loss 
-            # print(f"adding_loss: {loss:.3f}")
-            if batch > nbatches:
-                break
-    return total_val_loss / nbatches
+# def evaluate(test_model, test_loader):
+#     test_model.eval()
+#     total_val_loss = 0
+#     nbatches = min(100, test_size)
+#     print(f"number of evaluation batches: {nbatches}")
+#     with torch.no_grad():
+#         for batch, tokens in enumerate(test_loader):
+#             try: xidx = find_xent_def(tokens)[2]
+#             except Exception as e: 
+#                 print(f"Incurred in find_xent_def error: {e}")
+#                 print("Couldn't retrieve xidx: this is the returned value of the function:")
+#                 print(xidx)
+#                 print("The tokens tensor had this shape")
+#                 print(tokens.input_ids.shape)
+#                 print("And these are the tokens we fed it:")
+#                 print(tokens.input_ids)
+#                 continue
+#             tokens, attn_mask = tokens.input_ids.view(1, -1), tokens.attention_mask.view(1, -1)
+#             logits = test_model(input_ids=tokens, attention_mask=attn_mask).logits
+#             loss = crossentropy(logits[0, xidx:-1].view(-1, logits.shape[-1]), tokens[0, xidx+1:].view(-1))
+#             total_val_loss += loss 
+#             # print(f"adding_loss: {loss:.3f}")
+#             if batch > nbatches:
+#                 break
+#     return total_val_loss / nbatches
 
 best_loss = float("inf")
 best_model = None
@@ -210,37 +226,37 @@ model_save_folder = os.path.join(models_path, new_model_name)
 model_save_path = os.path.join(model_save_folder, new_model_name)
 os.makedirs(model_save_folder, exist_ok=True)
 
-f = open(os.path.join(model_save_folder, "console.txt"), "w+")
-sys.stdout = Tee(f)
+# f = open(os.path.join(model_save_folder, "debug.txt"), "w+")
+# sys.stdout = Tee(f)
 
 for epoch in range(EPOCHS):
     print(f"Training epoch: {epoch}/{EPOCHS}")
     train(M0)
-    print("Evaluating...", end=" ")
-    val_loss = evaluate(M0, test_loader=test_loader)
-    val_series.append(float(val_loss))
-    print(f"Validation loss: {val_loss:.5f}")
+    # print("Evaluating...", end=" ")
+    # val_loss = evaluate(M0, test_loader=test_loader)
+    # val_series.append(float(val_loss))
+    # print(f"Validation loss: {val_loss:.5f}")
 
-    if val_loss < best_loss:
-        best_loss = val_loss
-        best_model = M0
+    # if val_loss < best_loss:
+        # best_loss = val_loss
+        # best_model = M0
     
-    scheduler.step()
+    # scheduler.step()
 
-print("Saving the model...", end=" ")
-torch.save(M0, model_save_path)
-print("Model saved!", end=" ")
+# print("Saving the model...", end=" ")
+# torch.save(M0, model_save_path)
+# print("Model saved!", end=" ")
 
-with open(os.path.join(model_save_folder, "training_details.json"), "w") as js:
-    json.dump(
-        {
-            "test_log_interval": log_interval,
-            "test_size_aka_val_interval": test_size,
-            "loss_series": loss_series,
-            "val_series": val_series
-        },
-        js
-    )
-print("Details saved!")
+# with open(os.path.join(model_save_folder, "training_details.json"), "w") as js:
+    # json.dump(
+        # {
+            # "test_log_interval": log_interval,
+            # "test_size_aka_val_interval": test_size,
+            # "loss_series": loss_series,
+            # "val_series": val_series
+        # },
+        # js
+    # )
+# print("Details saved!")
 
 # wandb to plot things during training 
