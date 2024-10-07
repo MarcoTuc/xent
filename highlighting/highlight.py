@@ -3,14 +3,12 @@ import random
 import math 
 import torch
 import torch.nn.functional as F
-from transformers import AutoModelForCausalLM, AutoTokenizer
 from datasets import load_dataset
 from config import templates, device
 
 # wikipedia database
 database = load_dataset("wikipedia", "20220301.en", trust_remote_code=True)["train"]
 num_articles = len(database)
-
 
 class HilightWiki:
 

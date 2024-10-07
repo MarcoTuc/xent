@@ -1,5 +1,8 @@
 class X:
     
+    """ X is a static class, used as an utility to translate strings from python-like declarations to xent-type for synthetic data generation.
+        You can call its variables directly as X.xdef or define mappings inside of it such as the redblue one. """
+
     xdef    = "@##$$##@"
     opent     = "(("
     clost     = "))"
@@ -20,23 +23,26 @@ class X:
         "end": xend
     }
 
-    def map(self, function: str):
-        for map in self.mapper.items():
+    @classmethod
+    def map(cls, function: str):
+        for map in cls.mapper.items():
             function = function.replace(*map)
         return function
     
-    def invmap(self, text: str):
-        mapper  = {v: k for k, v in self.mapper.items()}
+    @classmethod
+    def invmap(cls, text: str):
+        mapper  = {v: k for k, v in cls.mapper.items()}
         for s in mapper.items():
             text = text.replace(*s)
         return text
-
-    def redblue(self, y: tuple, red, blue):
+    
+    @classmethod
+    def redblue(cls, y: tuple, red, blue):
         elems = {
             "y0": y[0],
             "y1": y[1],
             "red": red,
             "blue": blue,
         }
-        return self.map("def red-blue([{y0}, {y1}], {red}, {blue}):".format(**elems))
+        return cls.map("def red-blue([{y0}, {y1}], {red}, {blue}):".format(**elems))
    

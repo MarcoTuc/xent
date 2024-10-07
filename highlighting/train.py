@@ -17,14 +17,13 @@ import numpy as np
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
 import torch
-import torch.nn.functional as F
 from torch.utils.data import Dataset, DataLoader, random_split
 from torch.optim import AdamW
 from torch.optim.lr_scheduler import LambdaLR
 from torch.nn import CrossEntropyLoss
 
 # XENT code
-from highlight import XentLang as X
+from xentlang import X
 from utils import Tee
 
 device = torch.device("cuda:3")
@@ -39,6 +38,7 @@ LEARNING_RATE = 6e-4 # take it from Karpathy nano-GPT
 EPOCHS = 15
 # TODO add all the available hyperparameters
 data_split = 0.6 # train/test ratio
+batch_size = 12
 
 beta1 = 0.1
 beta2 = 0.95
@@ -106,11 +106,14 @@ def find_xent_def(tokens):
     windows = tokens.input_ids.unfold(dimension=2, size=seq_len, step=1)
     matches = (windows==xdefseq).all(dim=3)
     indices = matches.nonzero().squeeze(0)
+    print(indices)
     return indices
     
 
 # load the model
-path = os.path.join(models_path, "gpt2-xl-M0")
+model_name = "gpt2"
+model_version = "M0"
+path = os.path.join(models_path, model_name, model_version)
 M0, tokenizer = load_model_and_tokenizer(path)
 
 # load the data
@@ -127,7 +130,6 @@ train_dataset = TextDataset(train_dataset, tokenizer)
 print("Tokenizing test set:")
 test_dataset = TextDataset(test_dataset, tokenizer)
 
-batch_size = 1
 train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
 test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=True)
 
@@ -151,12 +153,8 @@ def train(model):
         try: xidx = find_xent_def(tokens)[2]
         except Exception as e: 
             print(f"Incurred in find_xent_def error: {e}")
-            print("Couldn't retrieve xidx: this is the returned value of the function:")
-            print(xidx)
-            print("The tokens tensor had this shape")
-            print(tokens.input_ids.shape)
-            print("And these are the tokens we fed it:")
-            print(tokens.input_ids)
+            print("This is because the piece of data at hand has incurred in an old bug that depends on the generation procedure.")
+            print("Skipping this datapoint and moving on to the next!")
             continue
         tokens, attn_mask = tokens.input_ids.view(1, -1), tokens.attention_mask.view(1, -1) # [B, T]
         logits = model(input_ids=tokens, attention_mask=attn_mask).logits  # [B, T, L]
@@ -165,7 +163,7 @@ def train(model):
         loss.backward()
         torch.nn.utils.clip_grad_norm_(model.parameters(), grad_clip)
         optimizer.step()
-        total_loss += loss.item() 
+        total_loss += loss.detach().data
         if (batch + 1) % log_interval == 0 and batch > 0:
             cur_loss = total_loss / log_interval
             loss_series.append(float(cur_loss))
@@ -185,12 +183,8 @@ def evaluate(test_model, test_loader):
             try: xidx = find_xent_def(tokens)[2]
             except Exception as e: 
                 print(f"Incurred in find_xent_def error: {e}")
-                print("Couldn't retrieve xidx: this is the returned value of the function:")
-                print(xidx)
-                print("The tokens tensor had this shape")
-                print(tokens.input_ids.shape)
-                print("And these are the tokens we fed it:")
-                print(tokens.input_ids)
+                print("This is because the piece of data at hand has incurred in an old bug that depends on the generation procedure.")
+                print("Skipping this datapoint and moving on to the next!")
                 continue
             tokens, attn_mask = tokens.input_ids.view(1, -1), tokens.attention_mask.view(1, -1)
             logits = test_model(input_ids=tokens, attention_mask=attn_mask).logits
@@ -204,10 +198,11 @@ def evaluate(test_model, test_loader):
 best_loss = float("inf")
 best_model = None
 
-
-new_model_name = "gpt2-xl-M1"
-model_save_folder = os.path.join(models_path, new_model_name)
-model_save_path = os.path.join(model_save_folder, new_model_name)
+new_model_version = "M1"
+if new_model_version == model_version:
+    raise NameError(f"New model version {new_model_version} should be different than the old model version {model_version}")
+model_save_folder = os.path.join(models_path, model_name, new_model_version)
+model_save_path = os.path.join(model_save_folder, new_model_version)
 os.makedirs(model_save_folder, exist_ok=True)
 
 f = open(os.path.join(model_save_folder, "console.txt"), "w+")
@@ -235,7 +230,7 @@ with open(os.path.join(model_save_folder, "training_details.json"), "w") as js:
     json.dump(
         {
             "test_log_interval": log_interval,
-            "test_size_aka_val_interval": test_size,
+            "train_size_aka_val_interval": train_size,
             "loss_series": loss_series,
             "val_series": val_series
         },
