@@ -37,14 +37,14 @@ new_model_version = "M1"
 
 # utility parameters
 cut_dataset = None
-log_in_text = False
+log_in_text = True
 
 # Hyperparameters
 LEARNING_RATE = 6e-4 # take it from Karpathy nano-GPT 
 EPOCHS = 15
 # TODO add all the available hyperparameters
 data_split = 0.6 # train/test ratio
-batch_size = 12
+batch_size = 10
 
 beta1 = 0.1
 beta2 = 0.95
@@ -105,15 +105,16 @@ class TextDataset(Dataset):
     def __getitem__(self, index) -> str:
         return self.dataset[index]
 
-def find_xent_def(tokens):
+def find_xent_def(tokens, return_len=False):
     """ Returns the index at which the xent function starts, needed for starting the loss computation """
-    xdefseq = tokenizer.encode(X.xdef, return_tensors="pt").to(device)
+    xdefseq = tokenizer.encode(X.xreturn, return_tensors="pt").to(device)
     seq_len = xdefseq.shape[1]
     windows = tokens.input_ids.unfold(dimension=2, size=seq_len, step=1)
     matches = (windows==xdefseq).all(dim=3)
     indices = matches.nonzero().squeeze(0)
+    if return_len:
+        return indices, seq_len
     return indices
-    
 
 # load the model
 path = os.path.join(models_path, model_name, model_version)
@@ -135,6 +136,7 @@ test_dataset = TextDataset(test_dataset, tokenizer)
 
 train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
 test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=True)
+gen_loader = DataLoader(test_dataset, batch_size=1, shuffle=True)
 
 crossentropy = CrossEntropyLoss()
 optimizer = AdamW(M0.parameters(), lr = LEARNING_RATE, betas=(beta1, beta2), eps=1e-9, weight_decay=0.01)
@@ -151,7 +153,7 @@ def train(model):
     start_time = time.time()
     for batch, tokens in enumerate(train_loader):
         optimizer.zero_grad()
-        try: xidx = find_xent_def(tokens)
+        try: xidx, xlen = find_xent_def(tokens, return_len=True)
         except Exception as e: 
             print(f"Incurred in find_xent_def error: {e}")
             print("This is because the piece of data at hand has incurred in an old bug that depends on the generation procedure.")
@@ -161,11 +163,12 @@ def train(model):
         logits = model(input_ids=tokens, attention_mask=attn_mask).logits  # [B, T, L]
         loss = 0
         for sample, _, fstart in xidx:
-            sample_logits = logits[sample, :, fstart:-1].view(-1, logits.size(-1)) # [T, L]
-            sample_targets = tokens[sample, :, fstart+1:].view(-1) # [T]
+            xstart = fstart + xlen
+            sample_logits = logits[sample, :, xstart:-1].view(-1, logits.size(-1)) # [T, L]
+            sample_targets = tokens[sample, :, xstart+1:].view(-1) # [T]
             sample_loss = crossentropy(sample_logits, sample_targets)
             loss += sample_loss
-        loss = loss / batch_size
+        loss = loss / logits.shape[0]
         loss.backward()
         torch.nn.utils.clip_grad_norm_(model.parameters(), grad_clip)
         optimizer.step()
@@ -175,9 +178,9 @@ def train(model):
             loss_series.append(float(cur_loss))
             elapsed = time.time() - start_time
             print(f"| batch: {batch+1} | loss: {cur_loss:.5f} | has taken: {elapsed:.2f} seconds")
+            generate_in_loop(model)
             total_loss = 0
             start_time = time.time()
-
 
 def evaluate(test_model, test_loader):
     test_model.eval()
@@ -186,7 +189,7 @@ def evaluate(test_model, test_loader):
     print(f"number of evaluation batches: {nbatches}")
     with torch.no_grad():
         for batch, tokens in enumerate(test_loader):
-            try: xidx = find_xent_def(tokens)
+            try: xidx, xlen = find_xent_def(tokens, return_len=True)
             except Exception as e: 
                 print(f"Incurred in find_xent_def error: {e}")
                 print("This is because the piece of data at hand has incurred in an old bug that depends on the generation procedure.")
@@ -196,16 +199,50 @@ def evaluate(test_model, test_loader):
             logits = test_model(input_ids=tokens, attention_mask=attn_mask).logits
             loss = 0
             for sample, _, fstart in xidx:
-                sample_logits = logits[sample, :, fstart:-1].view(-1, logits.size(-1))
-                sample_targets = tokens[sample, :, fstart+1:].view(-1)
+                xstart = fstart + xlen
+                sample_logits = logits[sample, :, xstart:-1].view(-1, logits.size(-1))
+                sample_targets = tokens[sample, :, xstart+1:].view(-1)
                 sample_loss = crossentropy(sample_logits, sample_targets)
                 loss += sample_loss
-            loss = sample_loss / batch_size
+            loss = loss / logits.shape[0]
             total_val_loss += loss 
-            # print(f"adding_loss: {loss:.3f}")
             if batch > nbatches:
                 break
     return total_val_loss / nbatches
+
+def generate_in_loop(gen_model):
+    gen_model.eval()
+    tokens = next(iter(gen_loader))
+    xidx, xlen = find_xent_def(tokens, return_len=True)
+    try: 
+        xstart = xidx[2] + xlen
+        prompt = tokens.input_ids[0, :, :xstart]
+        attn_mask = tokens.attention_mask[0, :, :xstart]
+    except Exception as e: 
+        print(f"xidx fuckup  {e}")
+        print(f"xidx tensor: {xidx}")
+        print(f"xidx shape:  {xidx.shape}")
+        return
+    
+    with torch.no_grad():
+        gen = gen_model.generate(
+            prompt, 
+            attention_mask=attn_mask,
+            do_sample=True, 
+            temperature=1.0, 
+            pad_token_id = gen_model.config.eos_token_id,
+            max_length = 1024,
+            )
+        print("\n------------------------------ GENERATION SAMPLE ------------------------------\n")
+        print(f"--------- prompt --------- | shape: {prompt.shape}")
+        dprompt = tokenizer.decode(gen[0, :prompt.shape[1]], skip_special_tokens=True)
+        print(dprompt)
+        print("--------- output ---------\n")
+        gen = tokenizer.decode(gen[0, prompt.shape[1]:], skip_special_tokens=True)
+        print(gen)
+        print("\n-----------------------------------  NEXT  ------------------------------------\n")
+
+    gen_model.train()
 
 best_loss = float("inf")
 best_model = None
@@ -230,13 +267,11 @@ for epoch in range(EPOCHS):
 
     if val_loss < best_loss:
         best_loss = val_loss
-        best_model = M0
+        print("Saving new best model...", end=" ")
+        torch.save(best_model, model_save_path)
+        print("Model saved!", end=" ")
     
     scheduler.step()
-
-print("Saving the model...", end=" ")
-torch.save(M0, model_save_path)
-print("Model saved!", end=" ")
 
 with open(os.path.join(model_save_folder, "training_details.json"), "w") as js:
     json.dump(
