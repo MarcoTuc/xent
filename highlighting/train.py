@@ -44,7 +44,7 @@ LEARNING_RATE = 6e-4 # take it from Karpathy nano-GPT
 EPOCHS = 15
 # TODO add all the available hyperparameters
 data_split = 0.6 # train/test ratio
-batch_size = 16
+batch_size = 12
 
 beta1 = 0.1
 beta2 = 0.95
@@ -161,8 +161,8 @@ def train(model):
         logits = model(input_ids=tokens, attention_mask=attn_mask).logits  # [B, T, L]
         loss = 0
         for sample, _, fstart in xidx:
-            sample_logits = logits[sample, fstart:-1].view(-1, logits.size(-1)) # [T, L]
-            sample_targets = tokens[sample, fstart+1:].view(-1) # [T]
+            sample_logits = logits[sample, :, fstart:-1].view(-1, logits.size(-1)) # [T, L]
+            sample_targets = tokens[sample, :, fstart+1:].view(-1) # [T]
             sample_loss = crossentropy(sample_logits, sample_targets)
             loss += sample_loss
         loss = loss / batch_size
@@ -186,7 +186,7 @@ def evaluate(test_model, test_loader):
     print(f"number of evaluation batches: {nbatches}")
     with torch.no_grad():
         for batch, tokens in enumerate(test_loader):
-            try: xidx = find_xent_def(tokens)[2]
+            try: xidx = find_xent_def(tokens)
             except Exception as e: 
                 print(f"Incurred in find_xent_def error: {e}")
                 print("This is because the piece of data at hand has incurred in an old bug that depends on the generation procedure.")
@@ -196,8 +196,8 @@ def evaluate(test_model, test_loader):
             logits = test_model(input_ids=tokens, attention_mask=attn_mask).logits
             loss = 0
             for sample, _, fstart in xidx:
-                sample_logits = logits[sample, fstart:-1].view(-1, logits.size(-1))
-                sample_targets = tokens[sample, fstart+1:].view(-1)
+                sample_logits = logits[sample, :, fstart:-1].view(-1, logits.size(-1))
+                sample_targets = tokens[sample, :, fstart+1:].view(-1)
                 sample_loss = crossentropy(sample_logits, sample_targets)
                 loss += sample_loss
             loss = sample_loss / batch_size
