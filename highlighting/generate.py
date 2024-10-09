@@ -52,7 +52,6 @@ def save_dataset(path: str, dataset: list[str]):
     with open(path, "ab") as f:
         pickle.dump(dataset, f)
 
-
 def load_dataset(path: str):
     with open(path, "rb") as data:
         return pickle.load(data)

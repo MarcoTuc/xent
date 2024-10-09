@@ -4,7 +4,25 @@ import math
 import torch
 import torch.nn.functional as F
 from datasets import load_dataset
-from config import templates, device
+
+templates =  [f"{t}\n" for t in [
+    "This is what I mean when I talk about {}.",
+    "{} is a pretty good title for this.",
+    "I found out that {} is about the following.",
+    "The things most commonly associated with {} are these.",
+    "I think this is about {}.",
+    "Whatever you say, this is about {}.",
+    "And here's what reminds me of {}.",
+    "{} screams from every corner of this.",
+    "If {} were a flavor, this would taste like it.",
+    "This dances to the rhythm of {}.",
+    "This has {} written all over it.",
+    "You can smell {} all over this.",
+    "If {} were a book, this would be its intro.",
+    "This is what {} looks like in reality.",
+    "This makes {} look like a close relative topic.",
+    ]
+]
 
 # wikipedia database
 database = load_dataset("wikipedia", "20220301.en", trust_remote_code=True)["train"]
@@ -12,9 +30,10 @@ num_articles = len(database)
 
 class HilightWiki:
 
-    def __init__(self, model, tokenizer):
+    def __init__(self, model, tokenizer, device):
         self.model = model
         self.tokenizer = tokenizer
+        self.device = device
         # define how you are going to separate W1 and W2
         self.acapo = self.tokenize("\n").input_ids
 
@@ -28,7 +47,7 @@ class HilightWiki:
         self.sub_window_size = math.floor(self.ctx_window/3)
 
 
-    def tokenize(self, text): return self.tokenizer(text, return_tensors="pt", padding=True).to(device)
+    def tokenize(self, text): return self.tokenizer(text, return_tensors="pt", padding=True).to(self.device)
     def detokenize_0(self, tokens): return self.tokenizer.decode(tokens[0], skip_special_tokens=True)
     def detokenize_w(self, tokens): return self.tokenizer.decode(tokens, skip_special_tokens=True)
     def detokenize_l(self, tokens): return [self.tokenizer.decode(tok, skip_special_tokens=True) for tok in tokens]
@@ -83,7 +102,8 @@ class HilightWiki:
 
 class WikiArticle:
 
-    def __init__(self, tokenize: Callable):
+    def __init__(self, tokenize: Callable, device):
+        self.device = device
         self.article = self.get_random_article()
         self.title = self.article["title"]
         self.slices = self.slice()
@@ -99,7 +119,7 @@ class WikiArticle:
         return [tokenize(s).input_ids for s in self.slices]
 
     def get_training_sample(self, max_len):
-        W = torch.tensor([[]]).to(device)
+        W = torch.tensor([[]]).to(self.device)
         for t in self.tlices[random.randint(0, len(self.tlices)-1):]:
             if W.size(1) + t.size(1) < max_len:
                 W = torch.cat([W, t], dim=-1)
