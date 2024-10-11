@@ -33,10 +33,10 @@ data_path = os.path.join(work_dir, "data")
 # define initial model version and new version
 model_name = "gpt2"
 model_version = "M0"
-new_model_version = "M1"
+new_model_version = "M1-big-cut"
 
 # utility parameters
-cut_dataset = None
+cut_dataset = 5000
 log_in_text = True
 
 # Hyperparameters
@@ -45,6 +45,8 @@ EPOCHS = 15
 # TODO add all the available hyperparameters
 data_split = 0.6 # train/test ratio
 batch_size = 10
+log_interval = 10
+eval_interval = 5
 
 beta1 = 0.1
 beta2 = 0.95
@@ -121,7 +123,7 @@ path = os.path.join(models_path, model_name, model_version)
 M0, tokenizer = load_model_and_tokenizer(path)
 
 # load the data
-D0 = load_dataset("D0")
+D0 = load_dataset("D0-big")
 if cut_dataset:
     D0 = D0[:cut_dataset]
 
@@ -145,7 +147,6 @@ scheduler = LambdaLR(optimizer, lr_lambda=lr_lambda, verbose=True)
 
 loss_series = []
 val_series = []
-log_interval = 10
 
 def train(model):
     model.train()
@@ -185,7 +186,7 @@ def train(model):
 def evaluate(test_model, test_loader):
     test_model.eval()
     total_val_loss = 0
-    nbatches = min(100, test_size)
+    nbatches = min(70, test_size)
     print(f"number of evaluation batches: {nbatches}")
     with torch.no_grad():
         for batch, tokens in enumerate(test_loader):
@@ -277,7 +278,8 @@ with open(os.path.join(model_save_folder, "training_details.json"), "w") as js:
     json.dump(
         {
             "test_log_interval": log_interval,
-            "train_size_aka_val_interval": train_size,
+            "train_size": train_size,
+            "batch_size": batch_size,
             "loss_series": loss_series,
             "val_series": val_series
         },

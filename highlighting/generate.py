@@ -3,13 +3,14 @@ import random
 from tqdm import tqdm
 
 from highlight import *
-from highlight import XentLang as X
+from xentlang import X
 
-X = X()
+import torch
+device = torch.device("cuda:3")
 
 def generate_data(model, tokenizer, keep_best):
 
-    HW = HilightWiki(model, tokenizer)
+    HW = HilightWiki(model, tokenizer, device)
     textok, t1, t2 = HW.extract()
 
     min_y_window = int(HW.sub_window_size)
@@ -55,4 +56,5 @@ def save_dataset(path: str, dataset: list[str]):
 def load_dataset(path: str):
     with open(path, "rb") as data:
         return pickle.load(data)
+
 

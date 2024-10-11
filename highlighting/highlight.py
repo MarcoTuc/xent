@@ -102,8 +102,8 @@ class HilightWiki:
 
 class WikiArticle:
 
-    def __init__(self, tokenize: Callable, device):
-        self.device = device
+    def __init__(self, tokenize: Callable):
+        self.device = torch.device("cuda:3")
         self.article = self.get_random_article()
         self.title = self.article["title"]
         self.slices = self.slice()

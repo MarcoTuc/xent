@@ -1,3 +1,4 @@
+
 class X:
     
     """ X is a static class, used as an utility to translate strings from python-like declarations to xent-type for synthetic data generation. You can call its variables directly as X.xdef or define mappings inside of it such as the redblue one. """
@@ -43,5 +44,5 @@ class X:
             "red": red,
             "blue": blue,
         }
-        return cls.map("def red-blue([{y0}, {y1}], {red}, {blue}):".format(**elems))
+        return cls.map("def red-blue([{y0}, {y1}], {red}, {blue}):").format(**elems)
    
