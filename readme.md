@@ -29,6 +29,9 @@
 > <config.py>:
     General boring configs like directories but also funny ones like the device you're using. 
 
+### Highlighting folder:
+This is the "0.1" version of it. It has been my first LLM project ever so it came up very messy and unorganized. I'm now refactoring everything in the xent folder for it to be more flexible and scalable for future development. In the meantime, this folder contains almost everything I did so far. 
+
 ### MISSING
 
 - Generalize the seed datasets, for now we only have wikipedia taken directly from huggingface datasets 

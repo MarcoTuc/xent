@@ -1,3 +1,5 @@
+# scrappy setup py to get started 
+
 from setuptools import setup, find_packages
 import os
 
