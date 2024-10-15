@@ -44,14 +44,15 @@ if new_model_version == model_version:
 # make directories for the new model
 model_save_folder = os.path.join(models_path, model_name, new_model_version)
 model_save_path = os.path.join(model_save_folder, new_model_version)
-os.makedirs(model_save_folder, exist_ok=True)
+try: os.makedirs(model_save_folder, exist_ok=False)
+except OSError: raise OSError(f"Please provide a different name to the new model. {new_model_version} already exists for {model_name}")
 
 # utility parameters
 cut_dataset = 5000 # if you want to cut the dataset for some reason.
 log_in_text = True # log training in a txt file. It will be inside models/{model_name}/{new_model_version}
 
 # training loop size
-EPOCHS = 15 # honestly 15 is too much, I would put it down to 5-6 as valid loss usually starts growing at epoch 4-5
+EPOCHS = 15 # I did 15 but it looks like too many, I would put it down to 5-6 as valid loss usually starts growing at epoch 4-5
 data_split = 0.6 # train/test ratio
 batch_size = 10 # how many batches per training loop
 log_interval = 10 # how many iterations until you report something. you get a report after log_interval*batch_size datapoints trained
