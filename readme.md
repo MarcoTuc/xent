@@ -8,7 +8,7 @@
 
 4. With menv activated, install the xent package as: `python setup.py develop`
 
-5. Populate the models folder with the base models you can use *the model_downloader.ipynb* notebook
+5. To populate the models folder with the base models you can use the *model_downloader.ipynb* notebook
 
 NOTE: Make sure you have nvcc>=11.6 on your Nvidia GPU
 
