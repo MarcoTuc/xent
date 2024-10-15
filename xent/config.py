@@ -1,4 +1,3 @@
 import os
-home = os.path.expanduser("~")
-work_dir = os.path.join(home, "synth")
+work_dir = os.getcwd()
 device = "cuda:3"

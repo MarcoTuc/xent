@@ -29,15 +29,14 @@ from utils import Tee
 
 # Set the device and standart paths for models and data
 device = torch.device("cuda:3")
-home_dir = os.path.expanduser("~")
-work_dir = os.path.join(home_dir, "synth", "highlighting")
+work_dir = os.path.join(os.getcwd(), "highlighting")
 models_path = os.path.join(work_dir, "models")
 data_path = os.path.join(work_dir, "data")
 
 # define initial model version and new version
 model_name = "gpt2"
 model_version = "M0"
-new_model_version = "M1-big-cut"
+new_model_version = "M1-test"
 # just check you are not overwriting an existing model
 if new_model_version == model_version:
     raise NameError(f"New model version {new_model_version} should be different than the old model version {model_version}")
@@ -46,6 +45,9 @@ model_save_folder = os.path.join(models_path, model_name, new_model_version)
 model_save_path = os.path.join(model_save_folder, new_model_version)
 try: os.makedirs(model_save_folder, exist_ok=False)
 except OSError: raise OSError(f"Please provide a different name to the new model. {new_model_version} already exists for {model_name}")
+
+# call the synthetic dataset you use for training
+synthetic_dataset_name = "D0-big"
 
 # utility parameters
 cut_dataset = 5000 # if you want to cut the dataset for some reason.
@@ -138,7 +140,7 @@ path = os.path.join(models_path, model_name, model_version)
 M0, tokenizer = load_model_and_tokenizer(path)
 
 # load the data
-D0 = load_dataset("D0-big")
+D0 = load_dataset(synthetic_dataset_name)
 if cut_dataset:
     D0 = D0[:cut_dataset]
 

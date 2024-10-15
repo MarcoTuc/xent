@@ -6,7 +6,7 @@
 
 3. Install the xent package inside the menv environent: `python setup.py develop`
 
-4. Populate the models folder with the base models you can use the <model_downloader.ipynb> notebook
+4. Populate the models folder with the base models you can use *the model_downloader.ipynb* notebook
 
 NOTE: Make sure you have nvcc>=11.6 on your Nvidia GPU
 
@@ -38,7 +38,9 @@ General boring configs like directories but also funny ones like the device you'
 --------------------
 
 ### Highlighting folder:
-This is the "0.1" version of it. It has been my first LLM project ever so it came up very messy and unorganized. I'm now refactoring everything in the xent folder for it to be more flexible and scalable for future development. In the meantime, this folder contains almost everything I did so far.
+This is the "0.1" version of it. It has been my first LLM project ever so it came up very messy and unorganized. I'm now refactoring everything in the xent folder for it to be more flexible and scalable for future development. In the meantime, this folder contains almost everything I did so far. \
+
+To make it work you need to copy/move the base models in the highlighting/models folder 
 
 --------
 
