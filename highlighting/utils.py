@@ -1,6 +1,6 @@
 class Tee(object):
     
-    """ So you want to print on a txt file instead of terminal, here you have it.
+    """ If you want to print on a txt file instead of terminal, here you have it.
         
         > How to use it
             import sys

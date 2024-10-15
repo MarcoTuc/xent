@@ -1,3 +1,6 @@
+# To test the training loop I just trained gpt2 on wikipedia data. 
+# You can ignore this script altogether but I'll leave it here. 
+
 import sys
 import os 
 home_dir = os.path.expanduser("~")

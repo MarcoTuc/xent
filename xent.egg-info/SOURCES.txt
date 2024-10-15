@@ -1,0 +1,5 @@
+setup.py
+xent.egg-info/PKG-INFO
+xent.egg-info/SOURCES.txt
+xent.egg-info/dependency_links.txt
+xent.egg-info/top_level.txt

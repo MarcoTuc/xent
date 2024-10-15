@@ -1,7 +1,8 @@
 
 class X:
     
-    """ X is a static class, used as an utility to translate strings from python-like declarations to xent-type for synthetic data generation. You can call its variables directly as X.xdef or define mappings inside of it such as the redblue one. """
+    """ X is a static class, used as an utility to translate strings from python-like declarations to xent-type for synthetic data generation. 
+        You can call its variables directly as X.xdef or define mappings inside of it such as the redblue one. """
 
     xdef    = "@##$$##@"
     opent     = "(("

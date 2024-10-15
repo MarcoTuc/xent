@@ -1,4 +1,4 @@
-from config import *
+from xent.config import *
 
 class X:
     
@@ -26,7 +26,7 @@ class X:
     }
 
     @classmethod
-    def map(cls, function: str):
+    def xmap(cls, function: str):
         for map in cls.mapper.items():
             function = function.replace(*map)
         return function
@@ -46,5 +46,4 @@ class X:
             "red": red,
             "blue": blue,
         }
-        return cls.map("def red-blue([{y0}, {y1}], {red}, {blue}):".format(**elems))
-   
+        return cls.xmap("def red-blue([{y0}, {y1}], {red}, {blue}):".format(**elems))

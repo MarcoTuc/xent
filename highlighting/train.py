@@ -1,32 +1,36 @@
+# Main training loop here, comments down below. 
+
+# OS IMPORTS 
 import sys
 import os 
-home_dir = os.path.expanduser("~")
-work_dir = os.path.join(home_dir, "synth", "highlighting")
 import logging
 logging.getLogger().setLevel(logging.INFO)
 import warnings
 warnings.filterwarnings("ignore")
 
+# GENERAL PYTHON IMPORTS
 import time
 import pickle
 import json
 from tqdm import tqdm
 
 # ML AND SCI LIBRARIES
+import torch
 import numpy as np
 from transformers import AutoModelForCausalLM, AutoTokenizer
-
-import torch
 from torch.utils.data import Dataset, DataLoader, random_split
 from torch.optim import AdamW
 from torch.optim.lr_scheduler import LambdaLR
 from torch.nn import CrossEntropyLoss
 
-# XENT code
+# CUSTOM IMPORTS
 from xentlang import X
 from utils import Tee
 
+# Set the device and standart paths for models and data
 device = torch.device("cuda:3")
+home_dir = os.path.expanduser("~")
+work_dir = os.path.join(home_dir, "synth", "highlighting")
 models_path = os.path.join(work_dir, "models")
 data_path = os.path.join(work_dir, "data")
 
@@ -34,25 +38,31 @@ data_path = os.path.join(work_dir, "data")
 model_name = "gpt2"
 model_version = "M0"
 new_model_version = "M1-big-cut"
+# just check you are not overwriting an existing model
+if new_model_version == model_version:
+    raise NameError(f"New model version {new_model_version} should be different than the old model version {model_version}")
+# make directories for the new model
+model_save_folder = os.path.join(models_path, model_name, new_model_version)
+model_save_path = os.path.join(model_save_folder, new_model_version)
+os.makedirs(model_save_folder, exist_ok=True)
 
 # utility parameters
-cut_dataset = 5000
-log_in_text = True
+cut_dataset = 5000 # if you want to cut the dataset for some reason.
+log_in_text = True # log training in a txt file. It will be inside models/{model_name}/{new_model_version}
 
-# Hyperparameters
-LEARNING_RATE = 6e-4 # take it from Karpathy nano-GPT 
-EPOCHS = 15
-# TODO add all the available hyperparameters
+# training loop size
+EPOCHS = 15 # honestly 15 is too much, I would put it down to 5-6 as valid loss usually starts growing at epoch 4-5
 data_split = 0.6 # train/test ratio
-batch_size = 10
-log_interval = 10
-eval_interval = 5
+batch_size = 10 # how many batches per training loop
+log_interval = 10 # how many iterations until you report something. you get a report after log_interval*batch_size datapoints trained
 
+# optimization parameters
+LEARNING_RATE = 6e-4 # took it from Karpathy nanoGPT 
 beta1 = 0.1
 beta2 = 0.95
 grad_clip = 1.0
 
-
+# MODEL LOADING METHODS
 def load_model_and_tokenizer(path: str):
     model = AutoModelForCausalLM.from_pretrained(path).to(device)
     tokenizer = AutoTokenizer.from_pretrained(path, clean_up_tokenization_spaces=True)
@@ -74,11 +84,12 @@ def load_tokenizer(path: str):
         tokenizer.pad_token = tokenizer.eos_token
     return tokenizer
 
-# DATA LOADING METHOD
+# DATASET LOADING METHOD
 def load_dataset(name: str):
     with open(os.path.join(data_path, f"{name}.pkl"), "rb") as data:
         return pickle.load(data)
-    
+
+# DATAPROCESSING CLASS
 class TextDataset(Dataset):
     def __init__(self, dataset: list[str], tokenizer, max_length=1024):
         self.tokenizer = tokenizer
@@ -107,6 +118,7 @@ class TextDataset(Dataset):
     def __getitem__(self, index) -> str:
         return self.dataset[index]
 
+# We train only on the output after prompt+xent_function. This helps to find the index at which you start computing the loss. 
 def find_xent_def(tokens, return_len=False):
     """ Returns the index at which the xent function starts, needed for starting the loss computation """
     xdefseq = tokenizer.encode(X.xreturn, return_tensors="pt").to(device)
@@ -118,6 +130,8 @@ def find_xent_def(tokens, return_len=False):
         return indices, seq_len
     return indices
 
+##############################################################################################################################
+
 # load the model
 path = os.path.join(models_path, model_name, model_version)
 M0, tokenizer = load_model_and_tokenizer(path)
@@ -127,27 +141,29 @@ D0 = load_dataset("D0-big")
 if cut_dataset:
     D0 = D0[:cut_dataset]
 
+# train split the data and make dataloaders 
 train_size = int(data_split * len(D0))
 test_size = len(D0) - train_size
-
 train_dataset, test_dataset = random_split(D0, [train_size, test_size])
 print("Tokenizing training set:")
 train_dataset = TextDataset(train_dataset, tokenizer)
 print("Tokenizing test set:")
 test_dataset = TextDataset(test_dataset, tokenizer)
-
 train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
 test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=True)
-gen_loader = DataLoader(test_dataset, batch_size=1, shuffle=True)
+gen_loader = DataLoader(test_dataset, batch_size=1, shuffle=True) # used to generate text samples you can see while training
 
+# initialize optimizator
 crossentropy = CrossEntropyLoss()
 optimizer = AdamW(M0.parameters(), lr = LEARNING_RATE, betas=(beta1, beta2), eps=1e-9, weight_decay=0.01)
 lr_lambda = lambda epoch: 0.965 ** epoch
 scheduler = LambdaLR(optimizer, lr_lambda=lr_lambda, verbose=True)
 
+# record what's going on
 loss_series = []
 val_series = []
 
+# training loop 
 def train(model):
     model.train()
     total_loss = 0
@@ -163,6 +179,7 @@ def train(model):
         tokens, attn_mask = tokens.input_ids, tokens.attention_mask # [B, T]
         logits = model(input_ids=tokens, attention_mask=attn_mask).logits  # [B, T, L]
         loss = 0
+        # loop down here is to train only on the output of the xent function
         for sample, _, fstart in xidx:
             xstart = fstart + xlen
             sample_logits = logits[sample, :, xstart:-1].view(-1, logits.size(-1)) # [T, L]
@@ -183,6 +200,7 @@ def train(model):
             total_loss = 0
             start_time = time.time()
 
+# evaluation loop
 def evaluate(test_model, test_loader):
     test_model.eval()
     total_val_loss = 0
@@ -211,6 +229,7 @@ def evaluate(test_model, test_loader):
                 break
     return total_val_loss / nbatches
 
+# generate while training
 def generate_in_loop(gen_model):
     gen_model.eval()
     tokens = next(iter(gen_loader))
@@ -245,14 +264,9 @@ def generate_in_loop(gen_model):
 
     gen_model.train()
 
+
 best_loss = float("inf")
 best_model = None
-
-if new_model_version == model_version:
-    raise NameError(f"New model version {new_model_version} should be different than the old model version {model_version}")
-model_save_folder = os.path.join(models_path, model_name, new_model_version)
-model_save_path = os.path.join(model_save_folder, new_model_version)
-os.makedirs(model_save_folder, exist_ok=True)
 
 if log_in_text:
     f = open(os.path.join(model_save_folder, "console.txt"), "w+")
@@ -286,5 +300,3 @@ with open(os.path.join(model_save_folder, "training_details.json"), "w") as js:
         js
     )
 print("Details saved!")
-
-# wandb to plot things during training 

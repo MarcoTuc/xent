@@ -1,12 +1,20 @@
 import random
+import pickle
 from datasets import load_dataset
 
-from config import * 
-from xentlang import X
+from xent.config import * 
+from xent.lang import X
 
 class DataProcessor:
-    def __init__():
-        pass
+    
+    data_dir = os.path.join(work_dir, "data")
+    
+    @classmethod
+    def pickle_dump(self, data, save_path):
+        os.makedirs(os.path.dirname(save_path), exist_ok=True)
+        with open(save_path, "wb") as f:
+            pickle.dump(data, f)
+
 
 class Wikipedia(DataProcessor):
     
@@ -15,7 +23,11 @@ class Wikipedia(DataProcessor):
         self.num_articles = len(self.database)
     
     def get_random_article(self):
-        return random.choice(self.database)        
+        return random.choice(self.database)
+
+    def get_random_article_text(self):
+        return random.choice(self.database)["text"]
+
 
 
 class SynthProcessor(DataProcessor):

@@ -1,3 +1,5 @@
+# Methods for data generation
+
 import pickle
 import random
 from tqdm import tqdm

@@ -1,26 +1,29 @@
-import os
 from typing import Literal
+
+import os
 import json
 
 import torch
+import torch.nn.functional as F
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
-from config import * 
+from xent.config import * 
 
-class M:
+class M():
 
     """ manage model loading and tokenization """
-
-    models_dir = os.path.join(work_dir, "models")
 
     def __init__(
             self, 
             model_name: str, 
-            model_version: str
+            model_version: str,
+            base: str = "base",
             ):
-
-        model_path = os.path.join(self.models_dir, model_name, model_version)
-        tokenizer_path = os.path.join(self.models_dir, model_name, "M0") # tokenizer is contained in the original version
+        
+        models_dir = os.path.join(work_dir, "models", base)
+        model_path = os.path.join(models_dir, model_name, model_version)      
+        tokens_dir = os.path.join(work_dir, "models", "base")
+        tokenizer_path = os.path.join(tokens_dir, model_name, "M0") # tokenizer is contained in the original version
         
         if model_version == "M0":
             self.model = self.load_origin_model(model_path)
@@ -33,37 +36,56 @@ class M:
         self.config = self.load_model_config(config_path)
         self.vocab_size = self.tokenizer.vocab_size
         if model_name.startswith("gpt"):
-            self.context_window = self.config["n_ctx"]
+            self.ctx_window = self.config["n_ctx"]
         else:
             print("Model initialized without context_window.")
             print("Use the set_context_window method to set it.")
 
-    def tokenize(self, text: str) -> dict[torch.Tensor, torch.Tensor]:
+    def tokenize(
+            self, 
+            text: str,
+            padding="do_not_pad"
+            ) -> dict[torch.Tensor, torch.Tensor]:
         """ The tokenize method returns a dictionary with following keys: 
             input_ids:      Tensor with token keys
             attention_mask: Tensor with the attention masking """
         return self.tokenizer(
             text, 
             return_tensors="pt",
-            # padding="max_length",
-            # truncation=True,
-            # max_length=self.context_window
+            padding=padding,
+            max_length=self.ctx_window
         ).to(device)
     
-    def detokenize(self, tokens, mode: Literal["single", "batch", "list"]) -> str:
-        modes = ["single", "batch", "list"]
+    def detokenize(self, tokens, mode: Literal["single", "tensor", "list", "full_batch"]) -> str:
+        """ single and list mode work only on a single sample. batch is for multiple batches """
+        modes = ["single", "tensor", "list", "full_batch"]
         if mode not in modes:
-            raise ValueError(f"mode {mode} is not in available modalities: {','.join(modes)}")
+            raise ValueError(f"mode {mode} is not in available modalities: {', '.join(modes)}")
         if mode == "single":
             return self.tokenizer.decode(tokens[0], skip_special_tokens=True)
-        elif mode == "batch":
-            #TODO check the behavior of batch mode
+        elif mode == "tensor":
             return self.tokenizer.decode(tokens, skip_special_tokens=True)
+        elif mode == "full_batch":
+            #TODO check the behavior of batch mode
+            return self.tokenizer.batch_decode(tokens, skip_special_tokens=True)
         elif mode == "list":
-            return [self.tokenizer.decode(tok, skip_special_tokens=True) for tok in tokens]    
+            return [self.tokenizer.decode([tok], skip_special_tokens=True) for tok in tokens[0]]    
     
+    def get_xent(
+            self, 
+            input, 
+            starting_index=None,
+            reduction="none"
+            ):
+        if isinstance(input, str): tokens = self.tokenize(input).input_ids
+        else: tokens = input
+        logits = self.model(tokens).logits
+        if starting_index:
+            return F.cross_entropy(logits[0, starting_index:-1], tokens[0, starting_index+1:], reduction=reduction)
+        else: return F.cross_entropy(logits[0, :-1], tokens[0, 1:], reduction=reduction)
+
     def set_context_window(self, value:int):
-        self.context_window = value
+        self.ctx_window = value
 
     @staticmethod
     def load_origin_model(path:str):

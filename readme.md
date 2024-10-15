@@ -1,0 +1,34 @@
+### SETUP
+
+1. create an environment inside this folder such as: `python -m venv -n menv` 
+
+2. activate the environment 
+
+3. run `python setup.py develop` to install the xent package 
+
+4. to populate the models folder with the base models you can use the <model_downloader.ipynb> notebook
+
+5. you're ready to go babe
+
+### The Xent Package
+
+> <dataprocessing.py>: 
+    Classes and methods to manipulate seed and synthetic datasets for subsequent generation and training purposes.
+> <lang.py>:
+    String manipulation methods to represent tasks in the xent language (eg: lots of unique symbols for the LLM to learn xent tasks)
+> <models.py>:
+    Utilities and some abstraction for loading, saving and using LLMs, their tokenizers and important parameters. 
+    It serves two purposes: use it to initialize a Task class to generate data with a model internals or use it to train the model via Trainer class.  
+> <tasks.py>:
+    Classes and methods that abstract the creation of tasks. 
+    You can create a new task by subclassing from the Task class and writing custom methods in it. The Task class has some handy methods to help you write down everything. By combining these with the abstractions in the M class, task writing should become easier. Ultimately a Task class is something that should be initialized with a model and used to generate data by combining it with a seed data extractor method which should return text to manipulate inside the task generation methods. 
+> <trainr.py>:
+    Put a model and a dataloader and you're training mah boyy. //UNDER CONSTRUCTION
+> <utils.py>:
+    Put general utilities here. For now we have a Tee class that I use to direct stdout to a txt file.
+> <config.py>:
+    General boring configs like directories but also funny ones like the device you're using. 
+
+### MISSING
+
+- Generalize the seed datasets, for now we only have wikipedia taken directly from huggingface datasets 

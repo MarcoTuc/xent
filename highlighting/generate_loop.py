@@ -1,9 +1,16 @@
+# General loop for generating red-blue highlighting data
+# Before using it you need to populate the models folder with a seed model. 
+# I always used gpt2 so it should work with it. 
+# It is not tested to work with any model from HF. 
+
 import os 
 from generate import generate_dataset, save_dataset
 
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
+
 device = torch.device("cuda:3")
+
 def load_model_and_tokenizer(path: str):
     model = AutoModelForCausalLM.from_pretrained(path).to(device)
     tokenizer = AutoTokenizer.from_pretrained(path, clean_up_tokenization_spaces=True)
