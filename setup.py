@@ -7,8 +7,10 @@ work_dir = os.getcwd()
 env_dir = os.path.join(work_dir, "menv")
 
 # make necessary directories
-os.makedirs(os.path.join(work_dir, "models"), exist_ok=False)
-os.makedirs(os.path.join(work_dir, "data"), exist_ok=False)
+try: os.makedirs(os.path.join(work_dir, "models"), exist_ok=False)
+except OSError: pass
+try: os.makedirs(os.path.join(work_dir, "data"), exist_ok=False)
+except OSError: pass
 
 # make directories for highlighting folder -- will be removed once xent package is complete
 hili_dir = os.path.join(work_dir, "highlighting")
@@ -17,16 +19,15 @@ except OSError: pass
 try: os.makedirs(os.path.join(hili_dir, "data"), exist_ok=False)
 except OSError: pass
 
-requirements = []
-with open('requirements.txt', 'r') as file:
-    for line in file:
-        requirement = line.strip()
-        if requirement and not requirement.startswith('#'):
-            requirements.append(requirement)
+# requirements = []
+# with open('requirements.txt', 'r') as file:
+#     for line in file:
+#         requirement = line.strip()
+#         if requirement and not requirement.startswith('#'):
+#             requirements.append(requirement)
 
 setup(
     name="xent",
     version="0.1",
     packages=find_packages(where=env_dir),
-    install_requires=requirements
 )

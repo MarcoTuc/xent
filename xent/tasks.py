@@ -69,7 +69,7 @@ class Closure(Task):
     def dataset_generator(
             self, 
             get_sample: Callable,
-            out_type: Literal["string", "tensor"]
+            out_type: Literal["text", "tokens"]
         ):
 
         def iterator(n_samples):

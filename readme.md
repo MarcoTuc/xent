@@ -1,12 +1,14 @@
 ### SETUP
 
-1. create an environment inside this folder and call it menv: `python -m venv -n menv`
+1. create an environment inside this folder and call it menv: `python -m venv menv`
 
 2. activate the environment `source menv/bin/activate`
 
-3. Install the xent package inside the menv environent: `python setup.py develop`
+3. Install the needed packages inside the menv environent: `pip install -r requirements.txt`
 
-4. Populate the models folder with the base models you can use *the model_downloader.ipynb* notebook
+4. With menv activated, install the xent package as: `python setup.py develop`
+
+5. Populate the models folder with the base models you can use *the model_downloader.ipynb* notebook
 
 NOTE: Make sure you have nvcc>=11.6 on your Nvidia GPU
 
