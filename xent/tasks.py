@@ -2,6 +2,8 @@ from typing import Type, Literal, Callable
 from tqdm import tqdm
 import random
 
+import torch 
+
 from xent.dataprocessing import DataProcessor
 from xent.config import * 
 from xent.models import M
@@ -18,6 +20,7 @@ class Task():
             ):
 
         self.M = language_model
+        self.generated_data = None
     
     def random_slice(self, T, length):
         if T.shape[1] <= length:
@@ -37,6 +40,43 @@ class Task():
         if return_len:
             return indices, seq_len
         return indices[1]
+    
+    def dataset_generator(
+            self, 
+            get_sample: Callable,
+            out_type: Literal["string", "tensor"]
+        ):
+        def iterator(n_samples):
+            tracker = tqdm(total=n_samples, desc="samples")
+            n = 0
+            while n < n_samples:
+                new = self.generate(get_sample)
+                tok = self.M.tokenize(new, padding="max_length").input_ids
+                if tok.shape[1] <= self.M.ctx_window:
+                    n += 1
+                    tracker.update(1)
+                    if out_type == "string": yield new
+                    elif out_type == "tensor": 
+                        yield tok
+                    else: raise ValueError("out_type should be 'string' or 'tensor'")
+                else: 
+                    continue
+        return iterator
+
+    def synthesize_dataset(
+            self, 
+            get_sample: Callable,
+            n_samples: int,
+            out_type: Literal["string", "tensor"],
+
+        ):
+        output = []
+        generator = self.dataset_generator(get_sample=get_sample, out_type=out_type)
+        for sample in generator(n_samples):
+            output.append(sample)
+        if out_type == "string": return output
+        elif out_type == "tensor": return torch.cat(output)
+
 
 
 class Closure(Task):
@@ -64,31 +104,6 @@ class Closure(Task):
         for txt, xnt in zip(stok[1:], xent):
             output_text = output_text + f"{txt}: {round(float(xnt))}\n"
         return output_text
-
-
-    def dataset_generator(
-            self, 
-            get_sample: Callable,
-            out_type: Literal["text", "tokens"]
-        ):
-
-        def iterator(n_samples):
-            tracker = tqdm(total=n_samples, desc="samples")
-            n = 0
-            while n < n_samples:
-                new = self.generate(get_sample)
-                tok = self.M.tokenize(new, padding="max_length").input_ids
-                if tok.shape[1] <= self.M.ctx_window:
-                    n += 1
-                    tracker.update(1)
-                    if out_type == "string": yield new
-                    elif out_type == "tensor": 
-                        yield tok
-                    else: raise ValueError("out_type should be 'string' or 'tensor'")
-                else: 
-                    continue
-        
-        return iterator
 
 
 
