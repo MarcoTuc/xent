@@ -27,8 +27,11 @@ class Trainer():
             batch_size,
             scheduler=None,
             shuffle=False, # keep false to avoid overlapping after each evolution step
-            grad_clip=1.0,
-            log_interval=10,
+            log_interval:int=10,
+            eval_points:int=100,
+            make_samples:bool=True,
+            sample_interval:int=None,
+            grad_clip:float=1.0,
             ):
 
         self.M = initial_model
@@ -41,18 +44,27 @@ class Trainer():
             self.D.test_set = self.tokenize_dataset(self.D.test_set)
         self.train_set, self.test_set = self.D.get_token_loaders()
         self.train_loader = DataLoader(self.train_set, batch_size=self.batch_size, shuffle=shuffle)
-        self.test_loader = DataLoader(self.test_set, batch_size=self.batch_size, shuffle=shuffle)
+        self.test_loader = DataLoader(self.test_set, batch_size=self.eval_points, shuffle=shuffle)
+        self.gen_loader = DataLoader(self.test_set, batch_size=1, shuffle=True)
         self.optimizer = optimizer
         self.scheduler = scheduler
         self.crossentropy = CrossEntropyLoss()
         self.grad_clip = grad_clip
+        
+        self.empty_lossess = torch.tensor([]).to(device)
         self.log_interval = log_interval
+        if sample_interval == None: self.sample_interval = log_interval
+        else: self.sample_interval = sample_interval
+        self.eval_points = min(eval_points, len(self.D.test_set))
+
+        if make_samples:
+            self.gen_table = []
+            self.make_samples = make_samples
 
     def simple_train(self):
-        loss_series = []
+        """ No in-training evaluation of the model and production of a sample at each log interval """
         self.M.model.train()
-        report_loss = 0
-        now = time()
+        losses = self.empty_lossess
         for batch, tokens in enumerate(self.train_loader):
             self.optimizer.zero_grad()           
             logits = self.M.model(input_ids=tokens).logits
@@ -61,15 +73,90 @@ class Trainer():
             loss.backward()
             clip_grad_norm_(self.M.model.parameters(), self.grad_clip)
             self.optimizer.step()
-            report_loss += loss.detach().data
-            if (batch+1) % self.log_interval == 0 and batch > 0:
-                cur_loss = report_loss / self.log_interval
-                loss_series.append(cur_loss)
-                now = time() - now
-                print(f"|| batch: {batch+1} | loss: {cur_loss:.3f} | has taken: {now:.3f} seconds")
-                now = time()
-                report_loss = 0
+            losses = torch.cat([losses, loss.unsqueeze(0)])
+            if batch % self.log_interval == 0:
+                avg_loss = losses.mean().item()
+                wandb.log({"avg_loss": avg_loss})
+                if self.make_samples: 
+                    prompt, gen_sample = self.gen_in_loop(split=True)
+                    self.gen_table.append([avg_loss, prompt, gen_sample])
+                    wandb.log({"generated_samples": wandb.Table(
+                                        columns=["loss", "prompt", "output"],
+                                        data=self.gen_table,
+                                        allow_mixed_types=True
+                                    )
+                                }
+                            )
+                losses = self.empty_lossess
+    
+    def train_with_validation(self):
+        self.M.model.train()
+        sampling_loss = self.empty_lossess
+        total_loss = self.empty_lossess
+        for batch, tokens in tqdm(enumerate(self.train_loader), desc="Training || "):
+            self.optimizer.zero_grad()           
+            logits = self.M.model(input_ids=tokens).logits
+            loss = self.compute_batch_loss(logits, tokens)
+            if loss == None: continue
+            loss.backward()
+            clip_grad_norm_(self.M.model.parameters(), self.grad_clip)
+            self.optimizer.step()
+            sampling_loss = torch.cat([sampling_loss, loss.unsqueeze(0)])
+            total_loss = torch.cat([total_loss, loss.unsqueeze(0)])
+            if self.make_samples and batch % self.sample_interval == 0:
+                avg_sample_loss = sampling_loss.mean().item()
+                wandb.log({"sample_loss": avg_sample_loss})
+                prompt, gen_sample = self.gen_in_loop(split=True)
+                self.gen_table.append([avg_sample_loss, prompt, gen_sample])
+                sampling_loss = self.empty_lossess
+                wandb.log({"generated_samples": wandb.Table(
+                                    columns=["loss", "prompt", "output"],
+                                    data=self.gen_table,
+                                    allow_mixed_types=True
+                                )})
+            if batch % self.log_interval == 0: # use log interval as validation interval here
+                avg_loss = total_loss.mean().item()
+                wandb.log({"train_loss": avg_loss})
+                self.evaluate() # will also log the validation loss
+                total_loss = self.empty_lossess
              
+    def evaluate(self):
+        self.M.model.eval()
+        valloss = self.empty_lossess
+        with torch.no_grad():
+            for tokens in self.test_loader:
+                logits = self.M.model(input_ids=tokens).logits
+                loss = self.compute_batch_loss(logits, tokens)
+                if loss == None: continue
+                valloss = torch.cat([valloss, loss.unsqueeze(0)])
+            wandb.log({"validation_loss": valloss.mean().item()})
+        self.M.model.train()
+    
+
+    def gen_in_loop(self, split=False):
+        self.M.model.eval()
+        sample = next(iter(self.gen_loader))
+        xidx, xlen = self.find_xstring(sample, X.xreturn, return_len=True)
+        xstart = xidx[1] + xlen
+        prompt = sample[0, :xstart]
+        attn_mask = torch.ones_like(prompt)
+        with torch.no_grad():
+            gen = self.M.model.generate(
+                prompt.unsqueeze(0), #TODO understand why I need this unsqueeze here to make it work
+                attention_mask=attn_mask.unsqueeze(0), #TODO understand why I need this unsqueeze here to make it work
+                do_sample=True,
+                temperature=1.0,
+                pad_token_id=self.M.model.config.eos_token_id,
+                max_length=self.M.ctx_window
+            )
+        self.M.model.train()        
+        if split:
+            output = self.M.detokenize(gen[0, len(prompt):], mode="tensor")
+            prompt = self.M.detokenize(prompt, "tensor")
+            return prompt, output
+        else:
+            return self.M.detokenize(gen[0], mode="tensor")
+
     def compute_batch_loss(
             self, 
             logits, # [B, T, V]
@@ -85,9 +172,10 @@ class Trainer():
             xstart = fstart + xlen - shift
             sample_logits = logits[sample, xstart:-1].view(-1, logits.size(-1)) # [T, V]
             sample_tokens = tokens[sample, xstart+1:].view(-1).long() # [T]
-            print(self.M.detokenize(sample_tokens, mode="tensor"))
             loss += self.crossentropy(sample_logits, sample_tokens)
-        return loss / logits.shape[0] # don't use default batch size here
+        batch_loss = loss / logits.shape[0] # don't use default batch size here
+        wandb.log({"batch_loss": batch_loss})
+        return batch_loss # don't use default batch size here
 
     def find_xstring(self, tokens, string, return_len=False):
         #TODO this method exists both in Task() and Trainer() classes. Should make it unique. 
@@ -104,3 +192,4 @@ class Trainer():
     def tokenize_dataset(self, data):
         tokenized = [self.M.tokenize(text, padding="max_length").input_ids for text in tqdm(data)]
         return torch.cat(tokenized)
+

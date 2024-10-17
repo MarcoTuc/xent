@@ -6,7 +6,7 @@
 .aid
 
 __pycache__
-
+wandb
 menv
 nanoGPT
 models
