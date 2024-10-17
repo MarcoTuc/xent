@@ -29,7 +29,7 @@ class Task():
 
     def find_xstring(self, tokens, string, return_len=False):
         """ Returns the index at which the xent function starts, needed for starting the loss computation """
-        xdefseq = self.M.tokenize(string).input_ids
+        xdefseq = self.M.tokenize(string).input_ids.to(device)
         seq_len = xdefseq.shape[1]
         windows = tokens.unfold(dimension=1, size=seq_len, step=1)
         matches = (windows==xdefseq).all(dim=2)

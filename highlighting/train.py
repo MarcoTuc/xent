@@ -36,15 +36,16 @@ data_path = os.path.join(work_dir, "data")
 # define initial model version and new version
 model_name = "gpt2"
 model_version = "M0"
-new_model_version = "M1-test"
+new_model_version = "M1-testing"
 # just check you are not overwriting an existing model
-if new_model_version == model_version:
-    raise NameError(f"New model version {new_model_version} should be different than the old model version {model_version}")
+# if new_model_version == model_version:
+#     raise NameError(f"New model version {new_model_version} should be different than the old model version {model_version}")
 # make directories for the new model
 model_save_folder = os.path.join(models_path, model_name, new_model_version)
 model_save_path = os.path.join(model_save_folder, new_model_version)
-try: os.makedirs(model_save_folder, exist_ok=False)
-except OSError: raise OSError(f"Please provide a different name to the new model. {new_model_version} already exists for {model_name}")
+try: os.makedirs(model_save_folder, exist_ok=True)
+except OSError: pass
+# except OSError: raise OSError(f"Please provide a different name to the new model. {new_model_version} already exists for {model_name}")
 
 # call the synthetic dataset you use for training
 synthetic_dataset_name = "D0-big"
@@ -55,7 +56,7 @@ log_in_text = True # log training in a txt file. It will be inside models/{model
 
 # training loop size
 EPOCHS = 15 # I did 15 but it looks like too many, I would put it down to 5-6 as valid loss usually starts growing at epoch 4-5
-data_split = 0.6 # train/test ratio
+data_split = 0.9 # train/test ratio
 batch_size = 10 # how many batches per training loop
 log_interval = 10 # how many iterations until you report something. you get a report after log_interval*batch_size datapoints trained
 
@@ -152,6 +153,7 @@ print("Tokenizing training set:")
 train_dataset = TextDataset(train_dataset, tokenizer)
 print("Tokenizing test set:")
 test_dataset = TextDataset(test_dataset, tokenizer)
+print(train_dataset.dataset)
 train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
 test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=True)
 gen_loader = DataLoader(test_dataset, batch_size=1, shuffle=True) # used to generate text samples you can see while training
