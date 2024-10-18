@@ -28,7 +28,7 @@ class Trainer():
             scheduler=None,
             shuffle=False, # keep false to avoid overlapping after each evolution step
             log_interval:int=10,
-            eval_points:int=100,
+            eval_size:int=100,
             make_samples:bool=True,
             sample_interval=None,
             grad_clip:float=1.0,
@@ -44,13 +44,13 @@ class Trainer():
         self.log_interval = log_interval
         if sample_interval == None: self.sample_interval = log_interval
         else: self.sample_interval = sample_interval
-        # we'll load a number of eval_points when doing evaluation
-        self.eval_points = min(eval_points, len(self.D.test_set)) 
+        # we'll load a number of eval_size when doing evaluation
+        self.eval_size = min(eval_size, len(self.D.test_set)) 
         # tokenize the dataset if it is made of text. You should flag this in the info.json of the data you generate.
         if self.D._info["data_content"] == "text":
-            print("Tokenizing the training set:\n")
+            tqdm.write("Tokenizing the training set:\n")
             self.D.train_set = self.tokenize_dataset(self.D.train_set)
-            print("Tokenizing the test set:\n")
+            tqdm.write("Tokenizing the test set:\n")
             self.D.test_set = self.tokenize_dataset(self.D.test_set)
         # make the actual split
         self.train_set, self.test_set = self.D.get_token_loaders()
@@ -77,7 +77,7 @@ class Trainer():
             self.make_samples = make_samples
         
         self.training_steps = len(self.train_set) / self.batch_size
-        self.testing_steps = self.eval_points / self.batch_size
+        self.testing_steps = self.eval_size / self.batch_size
 
     def simple_train(self):
         """ No in-training evaluation of the model and production of a sample at each log interval """
@@ -107,11 +107,11 @@ class Trainer():
                             )
                 losses = self.empty_lossess
     
-    def train_with_validation(self, saving_options=None):
+    def train_with_validation(self, saving_options=None, tot_epochs=None):
         self.M.model.train()
         sampling_loss = self.empty_lossess
         total_loss = self.empty_lossess
-        for batch, tokens in tqdm(enumerate(self.train_loader), desc="Training batch || ", total=self.training_steps):
+        for batch, tokens in tqdm(enumerate(self.train_loader), desc=f"Training epoch {self.epoch+1}/{tot_epochs} || ", total=self.training_steps):
             self.optimizer.zero_grad()           
             logits = self.M.model(input_ids=tokens).logits
             loss = self.compute_batch_loss(logits, tokens)
@@ -123,7 +123,6 @@ class Trainer():
             total_loss = torch.cat([total_loss, loss.unsqueeze(0)])
             if self.make_samples and batch % self.sample_interval == 0:
                 avg_sample_loss = sampling_loss.mean().item()
-                wandb.log({"sample_loss": avg_sample_loss})
                 prompt, gen_sample = self.gen_in_loop(split=True)
                 self.gen_table.append([avg_sample_loss, prompt, gen_sample])
                 sampling_loss = self.empty_lossess
@@ -133,14 +132,13 @@ class Trainer():
                                     allow_mixed_types=True
                                 )})
             if batch % self.log_interval == 0 and batch > 0: # use log interval as validation interval here
-                print(f"batch {batch}")
                 avg_loss = total_loss.mean().item()
-                wandb.log({"train_loss": avg_loss})
+                wandb.log({"train_loss": avg_loss}) # log the train_loss
                 self.evaluate(saving_options=saving_options) # will also log the validation loss
                 total_loss = self.empty_lossess
 
     def evaluate(self, saving_options=None):
-        print("Evaluating the model... ")
+        tqdm.write("Evaluating the model... ")
         self.M.model.eval()
         valloss = self.empty_lossess
         with torch.no_grad():
@@ -150,7 +148,6 @@ class Trainer():
                 if loss == None: continue
                 valloss = torch.cat([valloss, loss.unsqueeze(0)])
                 if batch == self.testing_steps:
-                    print("Enough testing, moving on... ")
                     break
             val_loss = valloss.mean().item()
             wandb.log({"validation_loss": val_loss})
@@ -161,7 +158,6 @@ class Trainer():
         self.M.model.train()
 
     def gen_in_loop(self, split=False):
-        print("Generating sample... ")
         self.M.model.eval()
         sample = next(iter(self.gen_loader))
         xidx, xlen = self.find_xstring(sample, X.xreturn, return_len=True)
@@ -193,7 +189,7 @@ class Trainer():
         loss = 0
         try: xidx, xlen = self.find_xstring(tokens, X.xreturn, return_len=True)
         except Exception as e: 
-            print(f"Error in the data, skipping... \n{e}")
+            tqdm.write(f"Error in the data, skipping... \n{e}")
             return None # then skip this in the main loop
         for sample, fstart in xidx:
             shift = 0 # KEEP 0 --- change for debugging purposes
@@ -235,10 +231,10 @@ class Trainer():
             model_name = self.M.model_name
         if new_version == self.M.model_version:
             new_version = f"{new_version}+1"
-            print(f"New version is the same as old version, changing name to: {new_version}")
+            tqdm.write(f"New version is the same as old version, changing name to: {new_version}")
         save_path = os.path.join(models_dir, base, model_name, new_version)
         model_save_path = os.path.join(save_path, new_version)
-        print(f"Saving new model into: {model_save_path}")
+        tqdm.write(f"Saving new model into: {model_save_path}")
         os.makedirs(save_path, exist_ok=True)
         torch.save(self.M.model, model_save_path)
         self.save_info(save_path)
@@ -260,5 +256,6 @@ class Trainer():
                 "training_epoch": self.epoch,
             }
         }
+        print(f"Validation loss: {self.best_loss:.3f} || Epoch: {self.epoch}")
         save_path = os.path.join(path, "info.json")
         json.dump(save, open(save_path, "w+"), indent=4)

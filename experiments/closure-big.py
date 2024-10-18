@@ -18,23 +18,26 @@ experiment_name = f"{project_name}_{now.strftime('%d-%b_%H:%M')}"
 
 base_model = "gpt2"
 model_version = "M0"
-new_model_version = "M1-big-test"
+new_model_version = "M1-big"
 
 task_name = "closure"
 data_version = "D0"
-cut_dataset = 200
+cut_dataset = None
 train_split = 0.5
+eval_size = 10000 # how many points you eval on
+batch_size = 10 # depends on available memory, on our V100s we can get to 10
 
-EPOCHS = 8
-batch_size = 10
-log_interval = 2 # also works as evaluation interval
-sample_interval = 2 # also works as evaluation interval
+# EVALUATION AND GENERATION INTERVALS
+# they refer to batches and not to data samples, so you:
+log_interval = 1000 # eval every log_interval*batch_size samples from the training set
+sample_interval = 500 # same as log but for generation
 
 LEARNING_RATE = 6e-4
 beta1 = 0.9
 beta2 = 0.95
 decay = 1e-1
 
+EPOCHS = 8
 
 model = M(
     base_model, 
@@ -61,6 +64,7 @@ trainer = Trainer(
             synthdata, 
             optimizer, 
             batch_size=batch_size, 
+            eval_size=eval_size,
             log_interval=log_interval,
             make_samples=True,
             sample_interval=sample_interval
@@ -83,9 +87,9 @@ wandb.init(
     }
 )
 
-for epoch in tqdm(range(EPOCHS)):
+for epoch in range(EPOCHS):
     wandb.log({"epoch": epoch})
-    trainer.train_with_validation(saving_options=saving_options)
+    trainer.train_with_validation(saving_options=saving_options, tot_epochs=EPOCHS)
     trainer.update_epoch(1)
 
 wandb.finish()
