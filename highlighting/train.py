@@ -269,7 +269,6 @@ def generate_in_loop(gen_model):
 
     gen_model.train()
 
-
 best_loss = float("inf")
 best_model = None
 

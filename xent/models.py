@@ -20,10 +20,15 @@ class M():
             base: str = "base",
             ):
         
-        models_dir = os.path.join(work_dir, "models", base)
-        model_path = os.path.join(models_dir, model_name, model_version)      
-        tokens_dir = os.path.join(work_dir, "models", "base")
-        tokenizer_path = os.path.join(tokens_dir, model_name, "M0") # tokenizer is contained in the original version
+        self.model_name = model_name
+        self.model_version = model_version
+        self.base = base
+
+        task_models_dir = os.path.join(work_dir, "models", base)
+        model_path = os.path.join(task_models_dir, model_name, model_version)     
+
+        base_models_dir = os.path.join(work_dir, "models", "base")
+        tokenizer_path = os.path.join(base_models_dir, model_name, "M0") # tokenizer is contained in the original version
         
         if model_version == "M0":
             self.model = self.load_origin_model(model_path)
@@ -31,7 +36,6 @@ class M():
             model_path = os.path.join(model_path, model_version)
             self.model = self.load_torch_model(model_path)
         self.tokenizer = self.load_tokenizer(tokenizer_path)
-        
         config_path = os.path.join(model_path, "config.json")
         self.config = self.load_model_config(config_path)
         self.vocab_size = self.tokenizer.vocab_size
@@ -39,7 +43,7 @@ class M():
             self.ctx_window = self.config["n_ctx"]
         else:
             print("Model initialized without context_window.")
-            print("Use the set_context_window method to set it.")
+            print("Use the set_context_window method to set it or you'll get errors somewhere.")
 
     def tokenize(
             self, 

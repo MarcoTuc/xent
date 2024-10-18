@@ -8,6 +8,7 @@ from torch.utils.data import Dataset, DataLoader, random_split
 from datasets import load_dataset
 
 from xent.config import * 
+from xent.utils import * 
 from xent.lang import X
 
 
@@ -45,10 +46,14 @@ class SynthProcessor(DataProcessor):
             cut_dataset=None
             ):
         
+        self.task_name = dataset_task
+        self.data_name = dataset_name
+
         self._path = os.path.join(data_dir, dataset_task, dataset_name)
         self._info = json.load(open(os.path.join(self._path, "info.json"), "r+"))
         self.train_split = train_split
         self.dataset = self.load_pickled_dataset()
+        self.cut_dataset = cut_dataset
         if cut_dataset:
             self.dataset = self.dataset[:cut_dataset]
             self.n_samples = len(self.dataset)
@@ -75,7 +80,7 @@ class SynthProcessor(DataProcessor):
 
     def get_token_loaders(self):
         return TokensDataset(self.train_set), TokensDataset(self.test_set)
-
+    
 
 class TokensDataset(Dataset):
     def __init__(self, dataset: torch.Tensor):
