@@ -20,7 +20,7 @@ import numpy as np
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from torch.utils.data import Dataset, DataLoader, random_split
 from torch.optim import AdamW
-from torch.optim.lr_scheduler import LambdaLR
+from torch.optim.lr_scheduler import LambdaLR, LinearLR
 from torch.nn import CrossEntropyLoss
 
 # CUSTOM IMPORTS
@@ -163,7 +163,7 @@ crossentropy = CrossEntropyLoss()
 optimizer = AdamW(M0.parameters(), lr = LEARNING_RATE, betas=(beta1, beta2), eps=1e-9, weight_decay=0.01)
 lr_lambda = lambda epoch: 0.965 ** epoch
 scheduler = LambdaLR(optimizer, lr_lambda=lr_lambda, verbose=True)
-
+scheduler = LinearLR(optimizer, start_factor=1e-7, end_factor=1, total_iters=2000)
 # record what's going on
 loss_series = []
 val_series = []
@@ -195,6 +195,7 @@ def train(model):
         loss.backward()
         torch.nn.utils.clip_grad_norm_(model.parameters(), grad_clip)
         optimizer.step()
+        
         total_loss += loss.detach().data
         if (batch + 1) % log_interval == 0 and batch > 0:
             cur_loss = total_loss / log_interval

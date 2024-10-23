@@ -180,6 +180,7 @@ def get_arg_text(xent_arg, xent_data):
 # XENT INSTRUCT [FUNCTIONS] CODE #
 ##################################
 
+## HIGHLIGHTING
 def xent_diff_prefix_ranked(xent_args, xent_data, xent_code_data): 
 	""" xent_data :::: diff-prefix-ranked ::: text ::: r_prefix ::: b_prefix :>:> xent_top_b_tokens ::: xent_top_r_tokens """
 	xent_arg_texts = [get_arg_text(xent_arg, xent_data) for xent_arg in xent_args]
@@ -205,6 +206,7 @@ def xent_diff_prefix_ranked(xent_args, xent_data, xent_code_data):
 	output = r_output + f' {xent_args_sep} ' + b_output
 	return output
 
+## CLOSURE WITH RANKING
 def xent_token_prob_entropy_ranked(xent_args, xent_data, xent_code_data):
 	""" xent_data :::: token-prob-entropy-ranked ::: text :>:> min_entropy_indices ::: max_entropy_indices """
 	log('Compute the min and max token probability entropies')

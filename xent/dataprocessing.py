@@ -15,10 +15,18 @@ from xent.lang import X
 class DataProcessor:
         
     @classmethod
-    def pickle_dump(self, data, save_path):
-        os.makedirs(os.path.dirname(save_path), exist_ok=True)
+    def pickle_dump(self, data, task_name, data_name, save_info=None):
+        task_dir = os.path.join(data_dir, task_name)
+        os.makedirs(task_dir, exist_ok=True)
+        save_path = os.path.join(task_dir, f"{data_name}.pkl")
         with open(save_path, "wb") as f:
             pickle.dump(data, f)
+        if save_info: self.save_info_json(save_info, task_dir)
+    
+    @classmethod
+    def save_info_json(self, save_info:dict, path:str):
+        save_path = os.path.join(path, "info.json")
+        json.dump(save_info, open(save_path, "w+"), indent=4)
 
 
 class Wikipedia(DataProcessor):
@@ -66,7 +74,7 @@ class SynthProcessor(DataProcessor):
             with open(os.path.join(self._path, f"{file}"), "rb") as data:
                 if self._info["data_type"] == "tensor": output.append(pickle.load(data))
                 elif self._info["data_type"] == "list": output.extend(pickle.load(data))
-        if self._info["data_type"] == "tensor": output = torch.cat(output).to(device)
+        if self._info["data_type"] == "tensor": output = torch.cat(output)
         self.n_samples = len(output)
         return output
 

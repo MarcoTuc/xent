@@ -77,7 +77,8 @@ class Task():
         if out_type == "string": return output
         elif out_type == "tensor": return torch.cat(output)
 
-
+class ClosureRanking(Task):
+    
 
 class Closure(Task):
 

@@ -94,7 +94,7 @@ class Trainer():
             losses = torch.cat([losses, loss.unsqueeze(0)])
             if batch % self.log_interval == 0:
                 avg_loss = losses.mean().item()
-                wandb.log({"avg_loss": avg_loss})
+                # wandb.log({"avg_loss": avg_loss})
                 if self.make_samples: 
                     prompt, gen_sample = self.gen_in_loop(split=True)
                     self.gen_table.append([avg_loss, prompt, gen_sample])
@@ -112,7 +112,8 @@ class Trainer():
         sampling_loss = self.empty_lossess
         total_loss = self.empty_lossess
         for batch, tokens in tqdm(enumerate(self.train_loader), desc=f"Training epoch {self.epoch+1}/{tot_epochs} || ", total=self.training_steps):
-            self.optimizer.zero_grad()           
+            self.optimizer.zero_grad()        
+            tokens = tokens.to(device)   
             logits = self.M.model(input_ids=tokens).logits
             loss = self.compute_batch_loss(logits, tokens)
             if loss == None: continue
@@ -143,6 +144,7 @@ class Trainer():
         valloss = self.empty_lossess
         with torch.no_grad():
             for batch, tokens in tqdm(enumerate(self.test_loader), desc="Testing batch || ", total=self.testing_steps):
+                tokens = tokens.to(device)
                 logits = self.M.model(input_ids=tokens).logits
                 loss = self.compute_batch_loss(logits, tokens)
                 if loss == None: continue
@@ -159,7 +161,7 @@ class Trainer():
 
     def gen_in_loop(self, split=False):
         self.M.model.eval()
-        sample = next(iter(self.gen_loader))
+        sample = next(iter(self.gen_loader)).to(device)
         xidx, xlen = self.find_xstring(sample, X.xreturn, return_len=True)
         xstart = xidx[1] + xlen
         prompt = sample[0, :xstart]
@@ -198,7 +200,7 @@ class Trainer():
             sample_tokens = tokens[sample, xstart+1:].view(-1).long() # [T]
             loss += self.crossentropy(sample_logits, sample_tokens)
         batch_loss = loss / logits.shape[0] # don't use default batch size here
-        wandb.log({"batch_loss": batch_loss})
+        # wandb.log({"batch_loss": batch_loss})
         return batch_loss # don't use default batch size here
 
     def find_xstring(self, tokens, string, return_len=False):
