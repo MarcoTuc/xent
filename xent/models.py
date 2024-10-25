@@ -18,6 +18,7 @@ class M():
             model_name: str, 
             model_version: str,
             base: str = "base",
+            reinitialize: bool = False
             ):
         
         self.model_name = model_name
@@ -30,11 +31,17 @@ class M():
         base_models_dir = os.path.join(work_dir, "models", "base")
         tokenizer_path = os.path.join(base_models_dir, model_name, "M0") # tokenizer is contained in the original version
         
-        if model_version == "M0":
-            self.model = self.load_origin_model(model_path)
-        else: 
-            model_path = os.path.join(model_path, model_version)
-            self.model = self.load_torch_model(model_path)
+        if reinitialize: # load only model shape and randomly initialized weights
+            from transformers import AutoConfig
+            config = AutoConfig.from_pretrained(model_path)
+            self.model = AutoModelForCausalLM.from_config(config).to(device)
+        else: # load the from-pretrained model 
+            if model_version == "M0":
+                self.model = self.load_origin_model(model_path)
+            else: 
+                model_path = os.path.join(model_path, model_version)
+                self.model = self.load_torch_model(model_path)
+        
         self.tokenizer = self.load_tokenizer(tokenizer_path)
         config_path = os.path.join(model_path, "config.json")
         self.config = self.load_model_config(config_path)
@@ -44,6 +51,8 @@ class M():
         else:
             print("Model initialized without context_window.")
             print("Use the set_context_window method to set it or you'll get errors somewhere.")
+        
+        
 
     def tokenize(
             self, 

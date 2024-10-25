@@ -261,3 +261,117 @@ class Trainer():
         print(f"Validation loss: {self.best_loss:.3f} || Epoch: {self.epoch}")
         save_path = os.path.join(path, "info.json")
         json.dump(save, open(save_path, "w+"), indent=4)
+
+
+
+class Evolver():
+    def __init__(
+            self,
+            initial_model: M,
+            optimizer
+        ):
+        
+        self.M = initial_model
+        self.optimizer = optimizer
+        
+        self.best_loss = float("inf")
+        self.empty_lossess = torch.tensor([]).to(device)
+        self.crossentropy = CrossEntropyLoss()
+        self.grad_clip = 1.0
+
+
+    def train_batch(self, tokens: torch.Tensor):
+        """ Train a batch and return the sum of the lossess per sample """
+        self.M.model.train()
+        batch_loss = self.empty_lossess
+        self.optimizer.zero_grad()        
+        tokens = tokens.to(device)   
+        logits = self.M.model(input_ids=tokens).logits
+        loss = self.compute_batch_loss(logits, tokens)
+        if loss == None: return None
+        loss.backward()
+        clip_grad_norm_(self.M.model.parameters(), self.grad_clip)
+        self.optimizer.step()
+        batch_loss = torch.cat([batch_loss, loss.unsqueeze(0)])
+        return batch_loss
+    
+    def eval_batch(self, tokens: torch.Tensor):
+        """ Evaluate a batch and return the sum of the lossess per sample """
+        self.M.model.eval()
+        valid_loss = self.empty_lossess
+        with torch.no_grad():
+            tokens = tokens.to(device)
+            logits = self.M.model(input_ids=tokens).logits
+            loss = self.compute_batch_loss(logits, tokens)
+            if loss == None: 
+                print("hello dudey") 
+                return None
+            valid_loss = torch.cat([valid_loss, loss.unsqueeze(0)])
+        return valid_loss
+
+    def perform_task(self, corpus_sample, split=False):
+        self.M.model.eval()
+        xidx, xlen = self.find_xstring(corpus_sample, X.xreturn, return_len=True)
+        xstart = xidx[1] + xlen
+        prompt = corpus_sample[0, :xstart]
+        attn_mask = torch.ones_like(prompt)
+        with torch.no_grad():
+            gen = self.M.model.generate(
+                prompt.unsqueeze(0), #TODO understand why I need this unsqueeze here to make it work
+                attention_mask=attn_mask.unsqueeze(0), #TODO understand why I need this unsqueeze here to make it work
+                do_sample=True,
+                temperature=1.0,
+                pad_token_id=self.M.model.config.eos_token_id,
+                max_length=self.M.ctx_window
+            )
+        if split:
+            output = self.M.detokenize(gen[0, len(prompt):], mode="tensor")
+            prompt = self.M.detokenize(prompt, "tensor")
+            return prompt, output
+        else:
+            return self.M.detokenize(gen[0], mode="tensor")
+
+    def compute_batch_loss(
+            self, 
+            logits, # [B, T, V]
+            tokens, # [B, T]
+            ):
+        loss = 0
+        try: xidx, xlen = self.find_xstring(tokens, X.xreturn, return_len=True)
+        except Exception as e: 
+            tqdm.write(f"Error in the data, skipping... \n{e}")
+            return None # then skip this in the main loop
+        for sample, fstart in xidx:
+            shift = 0 # KEEP 0 --- change for debugging purposes
+            xstart = fstart + xlen - shift
+            sample_logits = logits[sample, xstart:-1].view(-1, logits.size(-1)) # [T, V]
+            sample_tokens = tokens[sample, xstart+1:].view(-1).long() # [T]
+            loss += self.crossentropy(sample_logits, sample_tokens)
+        batch_loss = loss / logits.shape[0] # don't use default batch size here
+        return batch_loss # don't use default batch size here
+
+    def find_xstring(self, tokens, string, return_len=False):
+        #TODO this method exists both in Task() and Trainer() classes. Should make it unique. 
+        """ Returns the index at which the xent function starts, needed for starting the loss computation """
+        xdefseq = self.M.tokenize(string).input_ids.to(device)
+        seq_len = xdefseq.shape[1]
+        windows = tokens.unfold(dimension=1, size=seq_len, step=1)
+        matches = (windows==xdefseq).all(dim=2)
+        indices = matches.nonzero().squeeze(0)
+        if return_len:
+            return indices, seq_len
+        return indices[1]
+
+    def save_model(self, base=None, model_name=None, new_version=None):
+        if base == None: 
+            base = self.D.dataset_task 
+        if model_name == None: 
+            model_name = self.M.model_name
+        if new_version == self.M.model_version:
+            new_version = f"{new_version}+1"
+            tqdm.write(f"New version is the same as old version, changing name to: {new_version}")
+        save_path = os.path.join(models_dir, base, model_name, new_version)
+        model_save_path = os.path.join(save_path, new_version)
+        tqdm.write(f"Saving new model into: {model_save_path}")
+        os.makedirs(save_path, exist_ok=True)
+        torch.save(self.M.model, model_save_path)

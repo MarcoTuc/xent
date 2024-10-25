@@ -31,9 +31,16 @@ class DataProcessor:
 
 class Wikipedia(DataProcessor):
     
-    def __init__(self):
+    def __init__(self, split=None):
         self.database = load_dataset("wikipedia", "20220301.en", trust_remote_code=True)["train"]
         self.num_articles = len(self.database)
+        if isinstance(split, float):
+            self.split(split)
+    
+    def split(self, split):
+        train_size = int(split * self.num_articles)
+        test_size = self.num_articles - train_size
+        self.train_set, self.test_set = random_split(self.database, [train_size, test_size])
     
     def get_random_article(self):
         return random.choice(self.database)
@@ -41,6 +48,11 @@ class Wikipedia(DataProcessor):
     def get_random_article_text(self):
         return random.choice(self.database)["text"]
 
+    def get_random_train_text(self):
+        return random.choice(self.train_set)["text"]
+
+    def get_random_test_text(self):
+        return random.choice(self.test_set)["text"]
 
 class SynthProcessor(DataProcessor):
 
@@ -97,3 +109,9 @@ class TokensDataset(Dataset):
         return len(self.dataset)
     def __getitem__(self, index):
         return self.dataset[index]
+
+class TrainTestProcessor(Dataset):
+    def __init__(self, train_set, test_set):
+        self.train_set, self.test_set = train_set, test_set
+    def get_token_loaders(self):
+        return TokensDataset(self.train_set), TokensDataset(self.test_set)

@@ -1,4 +1,5 @@
-from typing import Type, Literal, Callable
+import sys
+from typing import Type, Literal, Callable, Union, List
 from tqdm import tqdm
 import random
 
@@ -47,7 +48,7 @@ class Task():
             out_type: Literal["string", "tensor"]
         ):
         def iterator(n_samples):
-            tracker = tqdm(total=n_samples, desc="samples")
+            tracker = tqdm(total=n_samples, desc="samples", disable=True)
             n = 0
             while n < n_samples:
                 new = self.generate(get_sample)
@@ -67,8 +68,7 @@ class Task():
             self, 
             get_sample: Callable,
             n_samples: int,
-            out_type: Literal["string", "tensor"],
-
+            out_type: Literal["string", "tensor"]
         ):
         output = []
         generator = self.dataset_generator(get_sample=get_sample, out_type=out_type)
@@ -77,8 +77,21 @@ class Task():
         if out_type == "string": return output
         elif out_type == "tensor": return torch.cat(output)
 
+
+    def dataset_synthesizer(
+            self,
+            get_sample: Callable, 
+            n_samples: int, 
+            out_type: Literal["string", "tensor"],
+        ) -> Callable:
+        return lambda: self.synthesize_dataset(
+            get_sample,
+            n_samples,
+            out_type
+        )
+
 class ClosureRanking(Task):
-    
+    pass
 
 class Closure(Task):
 
