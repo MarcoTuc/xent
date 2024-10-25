@@ -8,6 +8,7 @@ from tqdm import tqdm
 
 import torch 
 from torch.optim import AdamW
+from torch.optim.lr_scheduler import LinearLR
 
 from xent.config import *
 from xent.models import M
@@ -15,8 +16,8 @@ from xent.dataprocessing import Wikipedia
 from xent.tasks import Closure
 from xent.trainer import Trainer, Evolver
 
-project_name = "closure-longtraining"
-experiment_name = f"closure-evolution_{datetime.now().strftime('%d-%b_%H:%M')}"
+project_name = "closure-evolution"
+experiment_name = f"{project_name}_{datetime.now().strftime('%d-%b_%H:%M')}"
 
 base_model = "gpt2"
 model_version = "M0"
@@ -30,8 +31,8 @@ generation_split = 0.5
 
 # EVALUATION AND GENERATION INTERVALS
 # they refer to batches and not to data samples, so you:
-train_log_interval = valid_log_interval = 5 # eval every log_interval*batch_size samples from the training set
-sample_interval = 500 # sample interval
+train_log_interval = valid_log_interval = 200 # eval every log_interval*batch_size samples from the training set
+sample_interval = 200 # sample interval
 
 LEARNING_RATE = 6e-4
 beta1 = 0.9
@@ -58,11 +59,18 @@ make_gen = task.dataset_synthesizer(get_sample=get_test_sample, n_samples=1, out
 
 optimizer = AdamW(
             model.model.parameters(), 
-            lr=LEARNING_RATE, 
+            lr=LEARNING_RATE,
             betas=(beta1, beta2), 
             weight_decay=decay, 
             eps=1e-9
             )
+
+scheduler = LinearLR(
+    optimizer=optimizer,
+    start_factor=1e-7,
+    end_factor=1,
+    total_iters=2500,
+)
 
 saving_options = {
     "base": task_name, # the base will tell inside which folder to put the new model
@@ -71,7 +79,8 @@ saving_options = {
 
 evolver = Evolver(
     model, 
-    optimizer
+    optimizer,
+    scheduler,
 )
 
 wandb.init(
@@ -94,10 +103,12 @@ best_valid_loss = float("inf")
 gener_loss = empty_loss
 gen_table = []
 
+MAX_ITERS = int(1e6)
+
 while True:
     iter_counter += 1
     iter_bar.update(1)
-    t_loss = evolver.train_batch(make_train())
+    t_loss = evolver.train_batch(make_train(), step=iter_counter)
     train_loss = torch.cat([train_loss, t_loss])
     v_loss = evolver.eval_batch(make_test())
     valid_loss = torch.cat([valid_loss, v_loss])
@@ -105,14 +116,17 @@ while True:
 
     # training reporting
     if iter_counter % train_log_interval == 0:
-        wandb.log({"train_loss": train_loss.mean().item()})
+        wandb.log({"train_loss": train_loss.mean().item()}, step=iter_counter)
         train_loss = empty_loss
 
     # evaluation reporting
     if iter_counter % valid_log_interval == 0:
-        wandb.log({"valid_loss": train_loss.mean().item()})
+        valid_loss = valid_loss.mean().item()
+        wandb.log({"valid_loss": valid_loss}, step=iter_counter)
+        if valid_loss < best_valid_loss:
+            best_valid_loss = valid_loss
+            evolver.save_model(task_name, base_model, new_model_version)
         valid_loss = empty_loss
-        evolver.save_model(task_name, base_model, new_model_version)
 
     # generation reporting
     if iter_counter % sample_interval == 0:
@@ -124,6 +138,10 @@ while True:
                             data=gen_table,
                             allow_mixed_types=True
                         )})
+    
+    if iter_counter > MAX_ITERS:
+        evolver.save_model(task_name, base_model, f"{new_model_version}_LAST")
+        break
 
 
 wandb.finish()

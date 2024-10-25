@@ -268,11 +268,13 @@ class Evolver():
     def __init__(
             self,
             initial_model: M,
-            optimizer
+            optimizer,
+            scheduler,
         ):
         
         self.M = initial_model
         self.optimizer = optimizer
+        self.scheduler = scheduler
         
         self.best_loss = float("inf")
         self.empty_lossess = torch.tensor([]).to(device)
@@ -280,7 +282,7 @@ class Evolver():
         self.grad_clip = 1.0
 
 
-    def train_batch(self, tokens: torch.Tensor):
+    def train_batch(self, tokens: torch.Tensor, step=None):
         """ Train a batch and return the sum of the lossess per sample """
         self.M.model.train()
         batch_loss = self.empty_lossess
@@ -292,6 +294,7 @@ class Evolver():
         loss.backward()
         clip_grad_norm_(self.M.model.parameters(), self.grad_clip)
         self.optimizer.step()
+        self.scheduler.step()
         batch_loss = torch.cat([batch_loss, loss.unsqueeze(0)])
         return batch_loss
     
@@ -303,9 +306,7 @@ class Evolver():
             tokens = tokens.to(device)
             logits = self.M.model(input_ids=tokens).logits
             loss = self.compute_batch_loss(logits, tokens)
-            if loss == None: 
-                print("hello dudey") 
-                return None
+            if loss == None: return None
             valid_loss = torch.cat([valid_loss, loss.unsqueeze(0)])
         return valid_loss
 
