@@ -105,7 +105,7 @@ class Closure(Task):
     def generate(
             self,
             get_sample: Callable,
-            preprompt_share=1/5,
+            preprompt_share=1/5.2,
             space="tokens"
         ):
         original_text = get_sample()
@@ -127,7 +127,7 @@ class Closure(Task):
             xent_toks = torch.tensor([], dtype=torch.int).to(device)
             semicolon = self.M.tokenize(":").input_ids.to(device).squeeze(0)
             newline = self.M.tokenize("\n").input_ids.to(device).squeeze(0)
-            for tok, xnt in zip(sliced_toks[0, 1:], xent[:-1]):
+            for tok, xnt in zip(sliced_toks[0, 1:], xent): # xent is already left shifted
                 xntok = self.M.tokenize(f" {round(float(xnt))}").input_ids.to(device).squeeze(0)
                 # print(xent_toks.shape, tok.unsqueeze(0).shape, semicolon.shape, xntok.shape)
                 xent_toks = torch.cat([xent_toks, tok.unsqueeze(0), semicolon, xntok, newline], dim=-1)
