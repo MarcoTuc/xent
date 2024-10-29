@@ -31,11 +31,12 @@ class Task():
             output = T[:, start:start+length]
             return output
 
-    def find_xstring(self, tokens, string, return_len=False):
+    def find_xstring(self, source, target, return_len=False):
         """ Returns the index at which the xent function starts, needed for starting the loss computation """
-        xdefseq = self.M.tokenize(string).input_ids.to(device)
+        xdefseq = self.M.tokenize(target).input_ids.to(device) if isinstance(target, str) else target
+        source = self.M.tokenize(source).input_ids.to(device) if isinstance(source, str) else source
         seq_len = xdefseq.shape[1]
-        windows = tokens.unfold(dimension=1, size=seq_len, step=1)
+        windows = source.unfold(dimension=1, size=seq_len, step=1)
         matches = (windows==xdefseq).all(dim=2)
         indices = matches.nonzero().squeeze(0)
         if return_len:
@@ -51,7 +52,7 @@ class Task():
             tracker = tqdm(total=n_samples, desc="samples", disable=True)
             n = 0
             while n < n_samples:
-                new = self.generate(get_sample)
+                new = self.generate(get_sample, space=out_type)
                 tok = self.M.tokenize(new, padding="max_length").input_ids
                 if tok.shape[1] <= self.M.ctx_window:
                     n += 1
@@ -64,7 +65,7 @@ class Task():
                     continue
         return iterator
 
-    def synthesize_dataset(
+    def synthesize(
             self, 
             get_sample: Callable,
             n_samples: int,
@@ -84,14 +85,12 @@ class Task():
             n_samples: int, 
             out_type: Literal["string", "tensor"],
         ) -> Callable:
-        return lambda: self.synthesize_dataset(
+        return lambda: self.synthesize(
             get_sample,
             n_samples,
             out_type
         )
 
-class ClosureRanking(Task):
-    pass
 
 class Closure(Task):
 
@@ -106,19 +105,34 @@ class Closure(Task):
     def generate(
             self,
             get_sample: Callable,
+            preprompt_share=1/5,
+            space="tokens"
         ):
-        preprompt_share = 1/5
         original_text = get_sample()
         toks = self.M.tokenize(original_text).input_ids
         sliced_toks = self.random_slice(toks, int(self.M.ctx_window * preprompt_share))
         xent = self.M.get_xent(sliced_toks)
-        stok = self.M.detokenize(sliced_toks, mode="list")
-        sliced_text = self.M.detokenize(sliced_toks, mode="single")
-        output_text = sliced_text + f"\n{X.xdef} closure{X.opent}{X.clost}{X.xreturn}\n"
-        for txt, xnt in zip(stok[1:], xent):
-            output_text = output_text + f"{txt}: {round(float(xnt))}\n"
-        return output_text
-
+        if space == "text":
+            stok = self.M.detokenize(sliced_toks, mode="list")
+            sliced_text = self.M.detokenize(sliced_toks, mode="single")
+            output_text = sliced_text + f"\n{X.xdef} closure{X.opent}{X.clost}{X.xreturn}\n"
+            for txt, xnt in zip(stok[1:], xent[:-1]):
+                output_text = output_text + f"{txt}: {round(float(xnt))}\n"
+            return output_text
+        elif space == "tokens":
+            xentfunc = self.M.tokenize(
+                f"\n{X.xdef} closure{X.opent}{X.clost}{X.xreturn}\n"
+            ).input_ids.to(device)
+            output_toks = torch.cat([sliced_toks, xentfunc], dim=-1)
+            xent_toks = torch.tensor([], dtype=torch.int).to(device)
+            semicolon = self.M.tokenize(":").input_ids.to(device).squeeze(0)
+            newline = self.M.tokenize("\n").input_ids.to(device).squeeze(0)
+            for tok, xnt in zip(sliced_toks[0, 1:], xent[:-1]):
+                xntok = self.M.tokenize(f" {round(float(xnt))}").input_ids.to(device).squeeze(0)
+                # print(xent_toks.shape, tok.unsqueeze(0).shape, semicolon.shape, xntok.shape)
+                xent_toks = torch.cat([xent_toks, tok.unsqueeze(0), semicolon, xntok, newline], dim=-1)
+            output_toks = torch.cat([output_toks, xent_toks.unsqueeze(0)], dim=-1)
+            return output_toks
 
 
 class Highlight(Task):

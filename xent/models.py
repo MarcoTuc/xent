@@ -43,7 +43,7 @@ class M():
                 self.model = self.load_torch_model(model_path)
         
         self.tokenizer = self.load_tokenizer(tokenizer_path)
-        config_path = os.path.join(model_path, "config.json")
+        config_path = os.path.join(tokenizer_path, "config.json")
         self.config = self.load_model_config(config_path)
         self.vocab_size = self.tokenizer.vocab_size
         if model_name.startswith("gpt"):
@@ -69,7 +69,7 @@ class M():
             max_length=self.ctx_window
         ).to(device)
     
-    def detokenize(self, tokens, mode: Literal["single", "tensor", "list", "full_batch"]) -> str:
+    def detokenize(self, tokens, mode: Literal["single", "tensor", "list", "full_batch"]="tensor") -> str:
         """ single and list mode work only on a single sample. batch is for multiple batches """
         modes = ["single", "tensor", "list", "full_batch"]
         if mode not in modes:
@@ -106,7 +106,7 @@ class M():
 
     @staticmethod
     def load_torch_model(path:str):
-        return torch.load(path, weights_only=False).to(device)
+        return torch.load(path, weights_only=False, map_location=device)
 
     @staticmethod
     def load_tokenizer(path:str):
