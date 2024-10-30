@@ -54,6 +54,34 @@ class Wikipedia(DataProcessor):
     def get_random_test_text(self):
         return random.choice(self.test_set)["text"]
 
+    
+
+class SkeinAdventures(DataProcessor):
+    
+    def __init__(self, split=None):
+        self.database = load_dataset("ToastyPigeon/skein-text-adventures")["train"]
+        self.num_articles = len(self.database)
+        if isinstance(split, float):
+            self.split(split)
+    
+    def split(self, split):
+        train_size = int(split * self.num_articles)
+        test_size = self.num_articles - train_size
+        self.train_set, self.test_set = random_split(self.database, [train_size, test_size])
+    
+    def get_random_article(self):
+        return random.choice(self.database)
+
+    def get_random_article_text(self):
+        return random.choice(self.database)["text"]
+
+    def get_random_train_text(self):
+        return random.choice(self.train_set)["text"]
+
+    def get_random_test_text(self):
+        return random.choice(self.test_set)["text"]
+
+
 class SynthProcessor(DataProcessor):
 
     """ Process a synthetic dataset for training """
