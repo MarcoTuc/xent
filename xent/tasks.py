@@ -40,7 +40,7 @@ class Task():
         matches = (windows==xdefseq).all(dim=2)
         indices = matches.nonzero().squeeze(0)
         if return_len:
-            return indices, seq_len
+            return indices[1], seq_len
         return indices[1]
     
     def dataset_generator(
