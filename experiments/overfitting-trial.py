@@ -17,23 +17,23 @@ experiment_name = f"{project_name}_{datetime.now().strftime('%d-%b_%H:%M')}"
 
 base_model = "gpt2"
 model_version = "M0"
-new_model_version = "S1-over"
+new_model_version = "S1-1000"
 
 task_name = "closure"
 data_version = "D0-huge"
-cut_dataset = 1000
+cut_dataset = 100
 train_split = 0.5
-eval_size = 100 # how many points you eval on
-batch_size = 16 # depends on available memory, on our V100s we can get to 10
+eval_size = 50 # how many points you eval on
+batch_size = 10 # depends on available memory
 
 # EVALUATION AND GENERATION INTERVALS
 # they refer to batches and not to data samples, so you:
-log_interval = 10 # eval every log_interval*batch_size samples from the training set
+log_interval = 5 # eval every log_interval*batch_size samples from the training set
 sample_interval = 5 # same as log but for generation
 
 LEARNING_RATE = 6e-4
 
-EPOCHS = 10
+EPOCHS = 100
 
 model = M(
     base_model, 

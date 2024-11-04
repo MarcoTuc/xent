@@ -63,7 +63,12 @@ class Trainer():
         self.crossentropy = CrossEntropyLoss()
         self.optimizer = optimizer
         self.grad_clip = grad_clip
-        self.scheduler = scheduler #TODO implement
+        if scheduler: 
+            self.scheduler = scheduler 
+            self._do_schedule = True
+        else: 
+            self.scheduler = scheduler 
+            self._do_schedule = False
         
         # track loss for wandb reporting and model-saving purposes
         self.empty_lossess = torch.tensor([]).to(device)
@@ -90,6 +95,7 @@ class Trainer():
             loss.backward()
             clip_grad_norm_(self.M.model.parameters(), self.grad_clip)
             self.optimizer.step()
+            if self._do_schedule: self.scheduler.step()
             losses = torch.cat([losses, loss.unsqueeze(0)])
             if batch % self.log_interval == 0:
                 avg_loss = losses.mean().item()
@@ -119,6 +125,7 @@ class Trainer():
             loss.backward()
             clip_grad_norm_(self.M.model.parameters(), self.grad_clip)
             self.optimizer.step()
+            if self._do_schedule: self.scheduler.step()
             sampling_loss = torch.cat([sampling_loss, loss.unsqueeze(0)])
             total_loss = torch.cat([total_loss, loss.unsqueeze(0)])
             if self.make_samples and batch % self.sample_interval == 0:
@@ -131,7 +138,7 @@ class Trainer():
                                     data=self.gen_table,
                                     allow_mixed_types=True
                                 )})
-            if batch % self.log_interval == 0 and batch > 0: # use log interval as validation interval here
+            if batch % self.log_interval == 0: # use log interval as validation interval here
                 avg_loss = total_loss.mean().item()
                 wandb.log({"train_loss": avg_loss}) # log the train_loss
                 self.evaluate(saving_options=saving_options) # will also log the validation loss

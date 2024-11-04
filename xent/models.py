@@ -50,9 +50,7 @@ class M():
             self.ctx_window = self.config["n_ctx"]
         else:
             print("Model initialized without context_window.")
-            print("Use the set_context_window method to set it or you'll get errors somewhere.")
-        
-        
+            print("Use the set_context_window method to set it or you'll get errors somewhere.")        
 
     def tokenize(
             self, 
@@ -82,8 +80,17 @@ class M():
             #TODO check the behavior of batch mode
             return self.tokenizer.batch_decode(tokens, skip_special_tokens=True)
         elif mode == "list":
-            return [self.tokenizer.decode([tok], skip_special_tokens=True) for tok in tokens[0]]    
-    
+            return [self.tokenizer.decode([tok], skip_special_tokens=True) for tok in tokens[0]]
+            
+    def pad(self, tensor):
+        if len(tensor.shape) == 1:
+            tensor = tensor.unsqueeze(0)
+        pad_length = self.ctx_window - tensor.shape[1]
+        if pad_length > 0:
+            padding = torch.full((tensor.shape[0], pad_length), self.tokenizer.pad_token_id).to(device)
+            return torch.cat([tensor, padding], dim=1)
+        return tensor
+
     def get_xent(
             self, 
             input, 

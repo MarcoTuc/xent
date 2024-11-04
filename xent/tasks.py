@@ -21,7 +21,6 @@ class Task():
             ):
 
         self.M = language_model
-        self.generated_data = None
     
     def random_slice(self, T, length):
         if T.shape[1] <= length:
@@ -46,21 +45,21 @@ class Task():
     def dataset_generator(
             self, 
             get_sample: Callable,
-            out_type: Literal["string", "tensor"]
+            out_type: Literal["text", "tokens"]
         ):
         def iterator(n_samples):
             tracker = tqdm(total=n_samples, desc="samples", disable=True)
             n = 0
             while n < n_samples:
                 new = self.generate(get_sample, space=out_type)
-                tok = self.M.tokenize(new, padding="max_length").input_ids
+                tok = self.M.tokenize(new).input_ids if out_type == "text" else new
                 if tok.shape[1] <= self.M.ctx_window:
                     n += 1
                     tracker.update(1)
-                    if out_type == "string": yield new
-                    elif out_type == "tensor": 
+                    if out_type == "text": yield new
+                    elif out_type == "tokens": 
                         yield tok
-                    else: raise ValueError("out_type should be 'string' or 'tensor'")
+                    else: raise ValueError("out_type should be 'text' or 'tokens'")
                 else: 
                     continue
         return iterator
@@ -69,21 +68,21 @@ class Task():
             self, 
             get_sample: Callable,
             n_samples: int,
-            out_type: Literal["string", "tensor"]
+            out_type: Literal["text", "tokens"]
         ):
         output = []
         generator = self.dataset_generator(get_sample=get_sample, out_type=out_type)
         for sample in generator(n_samples):
             output.append(sample)
-        if out_type == "string": return output
-        elif out_type == "tensor": return torch.cat(output)
+        if out_type == "text": return output
+        elif out_type == "tokens": return torch.cat(output)
 
 
     def dataset_synthesizer(
             self,
             get_sample: Callable, 
             n_samples: int, 
-            out_type: Literal["string", "tensor"],
+            out_type: Literal["text", "tokens"],
         ) -> Callable:
         return lambda: self.synthesize(
             get_sample,
@@ -101,38 +100,39 @@ class Closure(Task):
         super().__init__(
             language_model, 
             )
+    
+        # the xent-function represnting the task
+        self.xent_call_text = f"\n{X.xdef} closure{X.opent}{X.clost}{X.xreturn}\n"
+        # tokenized - do not pad as you only want to pad the completed task
+        self.xent_call_toks = self.M.tokenize(self.xent_call_text, padding="do_not_pad").input_ids.to(device)
 
     def generate(
             self,
             get_sample: Callable,
-            preprompt_share=1/5.2,
+            preprompt_share=1/5.05,
             space="tokens"
         ):
-        original_text = get_sample()
-        toks = self.M.tokenize(original_text).input_ids
+        # get corpus of text from callable method
+        corpus = get_sample()
+        # get tokenized corpus
+        toks = self.M.tokenize(corpus).input_ids
+        # get a random slice of the tokens
         sliced_toks = self.random_slice(toks, int(self.M.ctx_window * preprompt_share))
+        # get the list of cross-entropy of sliced tokens
         xent = self.M.get_xent(sliced_toks)
-        if space == "text":
-            stok = self.M.detokenize(sliced_toks, mode="list")
-            sliced_text = self.M.detokenize(sliced_toks, mode="single")
-            output_text = sliced_text + f"\n{X.xdef} closure{X.opent}{X.clost}{X.xreturn}\n"
-            for txt, xnt in zip(stok[1:], xent[:-1]):
-                output_text = output_text + f"{txt}: {round(float(xnt))}\n"
-            return output_text
-        elif space == "tokens":
-            xentfunc = self.M.tokenize(
-                f"\n{X.xdef} closure{X.opent}{X.clost}{X.xreturn}\n"
-            ).input_ids.to(device)
-            output_toks = torch.cat([sliced_toks, xentfunc], dim=-1)
-            xent_toks = torch.tensor([], dtype=torch.int).to(device)
-            semicolon = self.M.tokenize(":").input_ids.to(device).squeeze(0)
-            newline = self.M.tokenize("\n").input_ids.to(device).squeeze(0)
-            for tok, xnt in zip(sliced_toks[0, 1:], xent): # xent is already left shifted
-                xntok = self.M.tokenize(f" {round(float(xnt))}").input_ids.to(device).squeeze(0)
-                # print(xent_toks.shape, tok.unsqueeze(0).shape, semicolon.shape, xntok.shape)
-                xent_toks = torch.cat([xent_toks, tok.unsqueeze(0), semicolon, xntok, newline], dim=-1)
-            output_toks = torch.cat([output_toks, xent_toks.unsqueeze(0)], dim=-1)
-            return output_toks
+        # concatenate the xent function to the corpus
+        output_toks = torch.cat([sliced_toks, self.xent_call_toks], dim=-1)
+        # initialize an empty tensor to concat xents into
+        xent_toks = torch.tensor([], dtype=torch.int).to(device)
+        # tokenize structural things 
+        semicolon = self.M.tokenize(":").input_ids.squeeze(0)
+        newline = self.M.tokenize("\n").input_ids.squeeze(0)
+        # loop to add the various {tok: xent} lines 
+        for tok, xnt in zip(sliced_toks[0, 1:], xent): # xent is already left shifted
+            xntok = self.M.tokenize(f" {round(float(xnt))}").input_ids.to(device).squeeze(0)
+            xent_toks = torch.cat([xent_toks, tok.unsqueeze(0), semicolon, xntok, newline], dim=-1)
+        output_toks = torch.cat([output_toks, xent_toks.unsqueeze(0)], dim=-1)
+        return self.M.pad(output_toks) # tokenizer padding is "do_not_pad" so we need to pad things at the end
 
 
 class Highlight(Task):
