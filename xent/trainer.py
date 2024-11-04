@@ -26,7 +26,7 @@ class Trainer():
             optimizer,
             batch_size,
             scheduler=None,
-            shuffle=False, # keep false to avoid overlapping after each evolution step
+            shuffle=False, 
             log_interval:int=10,
             eval_size:int=100,
             make_samples:bool=True,
@@ -57,8 +57,7 @@ class Trainer():
         # pick batch sized samples and feeds them to the training and evaluation loop
         self.train_loader = DataLoader(self.train_set, batch_size=self.batch_size, shuffle=shuffle)
         self.test_loader = DataLoader(self.test_set, batch_size=self.batch_size, shuffle=shuffle)
-        # pick an example from test set and run generation on it as an input
-        self.gen_loader = DataLoader(self.test_set, batch_size=1, shuffle=True)
+        self.gen_loader = DataLoader(self.test_set, batch_size=1, shuffle=True) # pick an example from test set and run generation on it as an input
         
         # trainer options defined externally. CrossEntropy is standard so it's just here. 
         self.crossentropy = CrossEntropyLoss()
