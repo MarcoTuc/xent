@@ -12,8 +12,35 @@ from xent.utils import *
 from xent.lang import X
 
 
+###########################################
+####### GENERAL DATAPROCESSING ##################################
+###########################################
+
 class DataProcessor:
         
+    def train_test_split(self, train_split = None):
+        """ Define a ratio to randomly split the dataset """
+        train_size = int(train_split * self.n_samples)
+        test_size = self.n_samples - train_size
+        self.train_set, self.test_set = random_split(self.dataset, [train_size, test_size])
+    
+    def exact_split(self, position):
+        """ Cut the dataset in a specific way """
+        self.train_set = self.dataset[:position]
+        self.test_set = self.dataset[position:]
+
+    def get_random_article(self):
+        return random.choice(self.database)
+
+    def get_random_article_text(self):
+        return random.choice(self.database)["text"]
+
+    def get_random_train_text(self):
+        return random.choice(self.train_set)["text"]
+
+    def get_random_test_text(self):
+        return random.choice(self.test_set)["text"]
+    
     @classmethod
     def pickle_dump(self, data, task_name, data_name, save_info=None):
         task_dir = os.path.join(data_dir, task_name)
@@ -27,7 +54,14 @@ class DataProcessor:
     def save_info_json(self, save_info:dict, path:str):
         save_path = os.path.join(path, "info.json")
         json.dump(save_info, open(save_path, "w+"), indent=4)
+    
 
+
+
+
+#############################################
+############## CORPUS DATASETS ########################################################################à
+#############################################
 
 class Wikipedia(DataProcessor):
     
@@ -35,26 +69,7 @@ class Wikipedia(DataProcessor):
         self.database = load_dataset("wikipedia", "20220301.en", trust_remote_code=True)["train"]
         self.num_articles = len(self.database)
         if isinstance(split, float):
-            self.split(split)
-    
-    def split(self, split):
-        train_size = int(split * self.num_articles)
-        test_size = self.num_articles - train_size
-        self.train_set, self.test_set = random_split(self.database, [train_size, test_size])
-    
-    def get_random_article(self):
-        return random.choice(self.database)
-
-    def get_random_article_text(self):
-        return random.choice(self.database)["text"]
-
-    def get_random_train_text(self):
-        return random.choice(self.train_set)["text"]
-
-    def get_random_test_text(self):
-        return random.choice(self.test_set)["text"]
-
-    
+            self.train_test_split(split)
 
 class SkeinAdventures(DataProcessor):
     
@@ -62,25 +77,17 @@ class SkeinAdventures(DataProcessor):
         self.database = load_dataset("ToastyPigeon/skein-text-adventures")["train"]
         self.num_articles = len(self.database)
         if isinstance(split, float):
-            self.split(split)
-    
-    def split(self, split):
-        train_size = int(split * self.num_articles)
-        test_size = self.num_articles - train_size
-        self.train_set, self.test_set = random_split(self.database, [train_size, test_size])
-    
-    def get_random_article(self):
-        return random.choice(self.database)
+            self.train_test_split(split)
 
-    def get_random_article_text(self):
-        return random.choice(self.database)["text"]
 
-    def get_random_train_text(self):
-        return random.choice(self.train_set)["text"]
 
-    def get_random_test_text(self):
-        return random.choice(self.test_set)["text"]
 
+
+
+
+#######################################################
+############# SYNTHETIC DATA PROCESSING ########################################################################à
+#######################################################
 
 class SynthProcessor(DataProcessor):
 
@@ -90,8 +97,10 @@ class SynthProcessor(DataProcessor):
             self,
             dataset_task,
             dataset_name,
-            train_split: float,
-            cut_dataset=None
+            train_split=None,
+            split_posit=None,
+            cut_dataset=None,
+            cut_trainset=None,
             ):
         
         self.task_name = dataset_task
@@ -102,33 +111,42 @@ class SynthProcessor(DataProcessor):
         self.train_split = train_split
         self.dataset = self.load_pickled_dataset()
         self.cut_dataset = cut_dataset
+        
+        # to cut the whole dataset
         if cut_dataset:
             self.dataset = self.dataset[:cut_dataset]
             self.n_samples = len(self.dataset)
-        self.train_test_split()
+        
+        # splitting the dataset
+        if train_split: self.train_test_split(train_split)
+        if split_posit: self.exact_split(split_posit)
+        
+        # after splitting, if you want to cut the training set 
+        if cut_trainset:
+            self.train_set = self.train_set[:cut_trainset]
+
 
     def load_pickled_dataset(self):
         data_files = [f for f in os.listdir(self._path) if f.endswith(".pkl")]
         output = []
         for file in data_files: 
             with open(os.path.join(self._path, f"{file}"), "rb") as data:
-                if self._info["data_type"] == "tensor": output.append(pickle.load(data))
+                if self._info["data_type"] == "tokens": output.append(pickle.load(data))
                 elif self._info["data_type"] == "list": output.extend(pickle.load(data))
-        if self._info["data_type"] == "tensor": output = torch.cat(output)
+        if self._info["data_type"] == "tokens": output = torch.cat(output)
         self.n_samples = len(output)
         return output
-
-    
-    def train_test_split(self, train_split = None):
-        if train_split == None:
-            split = self.train_split
-        train_size = int(split * self.n_samples)
-        test_size = self.n_samples - train_size
-        self.train_set, self.test_set = random_split(self.dataset, [train_size, test_size])
 
     def get_token_loaders(self):
         return TokensDataset(self.train_set), TokensDataset(self.test_set)
     
+
+
+
+
+#############################################
+########## HELPER DATAPROCESSING #############################################################
+#############################################
 
 class TokensDataset(Dataset):
     def __init__(self, dataset: torch.Tensor):

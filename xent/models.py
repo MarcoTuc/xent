@@ -5,7 +5,7 @@ import json
 
 import torch
 import torch.nn.functional as F
-from transformers import AutoModelForCausalLM, AutoTokenizer
+from transformers import AutoModelForCausalLM, AutoTokenizer, AutoConfig
 
 from xent.config import * 
 
@@ -31,13 +31,17 @@ class M():
         base_models_dir = os.path.join(work_dir, "models", "base")
         tokenizer_path = os.path.join(base_models_dir, model_name, "M0") # tokenizer is contained in the original version
         
-        if reinitialize: # load only model shape and randomly initialized weights
-            from transformers import AutoConfig
-            config = AutoConfig.from_pretrained(model_path)
+        config = AutoConfig.from_pretrained(model_path)
+        config.use_cache = False # disable KV-caching during training
+
+        if reinitialize: # load only model shape and randomly initialized weights  
             self.model = AutoModelForCausalLM.from_config(config).to(device)
         else: # load the from-pretrained model 
             if model_version == "M0":
-                self.model = self.load_origin_model(model_path)
+                self.model = AutoModelForCausalLM.from_pretrained(
+                    model_path, 
+                    config=config
+                ).to(device)
             else: 
                 model_path = os.path.join(model_path, model_version)
                 self.model = self.load_torch_model(model_path)
@@ -46,6 +50,7 @@ class M():
         config_path = os.path.join(tokenizer_path, "config.json")
         self.config = self.load_model_config(config_path)
         self.vocab_size = self.tokenizer.vocab_size
+        
         if model_name.startswith("gpt"):
             self.ctx_window = self.config["n_ctx"]
         else:
@@ -93,23 +98,23 @@ class M():
 
     def get_xent(
             self, 
-            input, 
-            starting_index=None,
+            input:torch.Tensor, 
+            starting_index=0,
             reduction="none"
             ):
         if isinstance(input, str): tokens = self.tokenize(input).input_ids
         else: tokens = input
         logits = self.model(tokens).logits
-        if starting_index:
-            return F.cross_entropy(logits[0, starting_index:-1], tokens[0, starting_index+1:], reduction=reduction)
-        else: return F.cross_entropy(logits[0, :-1], tokens[0, 1:], reduction=reduction)
+        return F.cross_entropy(logits[0, starting_index:-1], tokens[0, starting_index+1:], reduction=reduction)
 
     def set_context_window(self, value:int):
         self.ctx_window = value
 
     @staticmethod
     def load_origin_model(path:str):
-        return AutoModelForCausalLM.from_pretrained(path).to(device) 
+        return AutoModelForCausalLM.from_pretrained(
+            path,
+            torch_dtype=torch.float16).to(device) 
 
     @staticmethod
     def load_torch_model(path:str):

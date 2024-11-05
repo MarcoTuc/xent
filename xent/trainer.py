@@ -52,12 +52,32 @@ class Trainer():
             self.D.train_set = self.tokenize_dataset(self.D.train_set)
             tqdm.write("Tokenizing the test set:\n")
             self.D.test_set = self.tokenize_dataset(self.D.test_set)
+        
         # make the actual split
         self.train_set, self.test_set = self.D.get_token_loaders()
+        
         # pick batch sized samples and feeds them to the training and evaluation loop
-        self.train_loader = DataLoader(self.train_set, batch_size=self.batch_size, shuffle=shuffle)
-        self.test_loader = DataLoader(self.test_set, batch_size=self.batch_size, shuffle=shuffle)
-        self.gen_loader = DataLoader(self.test_set, batch_size=1, shuffle=True) # pick an example from test set and run generation on it as an input
+        self.train_loader = DataLoader(
+                                self.train_set, 
+                                batch_size=self.batch_size, 
+                                shuffle=shuffle,
+                                pin_memory=True,
+                                persistent_workers=True,
+                                num_workers=1)
+        self.test_loader = DataLoader(
+                                self.test_set, 
+                                batch_size=self.batch_size, 
+                                shuffle=shuffle,
+                                pin_memory=True,
+                                persistent_workers=True,
+                                num_workers=1)
+        self.gen_loader = DataLoader(
+                                self.test_set, 
+                                batch_size=1, 
+                                shuffle=True,
+                                pin_memory=True,
+                                persistent_workers=True,
+                                num_workers=1) # pick an example from test set and run generation on it as an input
         
         # trainer options defined externally. CrossEntropy is standard so it's just here. 
         self.crossentropy = CrossEntropyLoss()
@@ -86,6 +106,7 @@ class Trainer():
     def simple_train(self):
         """ No in-training evaluation of the model and production of a sample at each log interval """
         self.M.model.train()
+        sampling_loss = self.empty_lossess
         losses = self.empty_lossess
         for batch, tokens in enumerate(self.train_loader):
             self.optimizer.zero_grad()           
@@ -205,9 +226,8 @@ class Trainer():
             sample_logits = logits[sample, xstart:-1].view(-1, logits.size(-1)) # [T, V]
             sample_tokens = tokens[sample, xstart+1:].view(-1).long() # [T]
             loss += self.crossentropy(sample_logits, sample_tokens)
-        batch_loss = loss / logits.shape[0] # don't use default batch size here
-        # wandb.log({"batch_loss": batch_loss})
-        return batch_loss # don't use default batch size here
+        batch_loss = loss / logits.shape[0] # batch size at logits.shape[0]
+        return batch_loss 
 
     def find_xstring(self, tokens, string, return_len=False):
         #TODO this method exists both in Task() and Trainer() classes. Should make it unique. 
