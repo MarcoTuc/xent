@@ -11,9 +11,9 @@ from xent.models import M
 from xent.dataprocessing import Wikipedia, DataProcessor
 
 task_name = "closure"
-data_name = "D0-correct"
-n_samples = 9e5
-save_truncate = 3e5
+data_name = "D0-correct-big"
+n_samples = 8e6
+save_truncate = 8e5
 out_type= "tokens"
 
 def generate_samples(process_id, n_samples_per_process):

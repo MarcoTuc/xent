@@ -1,4 +1,4 @@
-message = """ Training gpt2 on a whole 1e6 samples closure-task dataset """
+message = """ Training GPT2 on 800 D0-correct samples to check for dataset-size scaling laws"""
 
 import os
 from datetime import datetime
@@ -13,28 +13,32 @@ from xent.dataprocessing import SynthProcessor
 from xent.trainer import Trainer
 
 project_name = "scaling"
-experiment_name = f"{project_name}_{datetime.now().strftime('%d-%b_%H:%M')}"
+scaling_name = "8e5"
+experiment_name = f"{project_name}_{scaling_name}_{datetime.now().strftime('%d-%b_%H:%M')}"
 
 base_model = "gpt2"
 model_version = "M0"
 
 task_name = "closure"
-data_version = "D0-huge"
-cut_dataset = 100
-train_split = 0.5
-eval_size = 50 # how many points you eval on
+data_version = "D0-correct"
+cut_trainset = int(float(scaling_name))
+eval_size = 1000 # how many points you eval on
 batch_size = 10 # depends on available memory
 
-new_model_version = f"S1-{cut_dataset}"
+new_model_version = f"S1-{scaling_name}"
 
 # EVALUATION AND GENERATION INTERVALS
 # they refer to batches and not to data samples, so you:
-log_interval = 5 # eval every log_interval*batch_size samples from the training set
-sample_interval = 5 # same as log but for generation
+log_interval = 80 # eval every log_interval*batch_size samples from the training set
+sample_interval = 40 # same as log but for generation
 
 LEARNING_RATE = 6e-4
 
-EPOCHS = 100
+FIXED_COMPUTE_STEPS = 8e4
+
+EPOCHS = int(FIXED_COMPUTE_STEPS * batch_size / cut_trainset)
+
+print(f"Training for epochs: {EPOCHS}")
 
 model = M(
     base_model, 
@@ -44,8 +48,8 @@ model = M(
 synthdata = SynthProcessor(
             task_name, 
             data_version, 
-            train_split=train_split, 
-            cut_dataset=cut_dataset
+            split_posit=800000, # dataset D0-correct has 900000 samples, of which we use 800000 for training and 100000 for testing
+            cut_trainset=cut_trainset
             )
 
 optimizer = AdamW(

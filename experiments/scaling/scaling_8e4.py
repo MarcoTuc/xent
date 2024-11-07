@@ -25,7 +25,7 @@ cut_trainset = int(float(scaling_name))
 eval_size = 1000 # how many points you eval on
 batch_size = 10 # depends on available memory
 
-new_model_version = f"S1-{scaling_name}"
+new_model_version = f"S1-{scaling_name}-2"
 
 # EVALUATION AND GENERATION INTERVALS
 # they refer to batches and not to data samples, so you:

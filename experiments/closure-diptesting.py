@@ -12,24 +12,24 @@ from xent.models import M
 from xent.dataprocessing import SynthProcessor
 from xent.trainer import Trainer
 
-project_name = "closure-longtraining"
+project_name = "diptesting"
 experiment_name = f"{project_name}_{datetime.now().strftime('%d-%b_%H:%M')}"
 
 base_model = "gpt2"
 model_version = "M0"
-new_model_version = "M1-big"
+new_model_version = "M1-diptest"
 
 task_name = "closure"
-data_version = "D0-huge"
+data_version = "D0"
 cut_dataset = None
-train_split = 0.5
-eval_size = 10000 # how many points you eval on
-batch_size = 16 # depends on available memory, on our V100s we can get to 10
+train_split = 0.8
+eval_size = 1000 # how many points you eval on
+batch_size = 10 # depends on available memory, on our V100s we can get to 10
 
 # EVALUATION AND GENERATION INTERVALS
 # they refer to batches and not to data samples, so you:
-log_interval = 1000 # eval every log_interval*batch_size samples from the training set
-sample_interval = 500 # same as log but for generation
+log_interval = 100 # eval every log_interval*batch_size samples from the training set
+sample_interval = 50 # same as log but for generation
 
 LEARNING_RATE = 6e-4
 beta1 = 0.9
