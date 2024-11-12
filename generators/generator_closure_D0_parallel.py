@@ -7,14 +7,16 @@ import torch
 
 from xent.config import *
 from xent.tasks import Closure
-from xent.models import M
-from xent.dataprocessing import Wikipedia, DataProcessor
+from xent import M
+from xent.datasets import Wikipedia, DataProcessor
 
 task_name = "closure"
-data_name = "D0-correct-big"
+data_name = "D0-inverse"
 n_samples = 8e6
 save_truncate = 8e5
 out_type= "tokens"
+
+xent_order_inverse = True
 
 def generate_samples(process_id, n_samples_per_process):
     print(f"Process {process_id} started")
@@ -25,7 +27,7 @@ def generate_samples(process_id, n_samples_per_process):
     datasource = Wikipedia()
     task_0 = Closure(model_0)
     
-    dataset_generator = task_0.dataset_generator(datasource.get_random_article_text, out_type=out_type)
+    dataset_generator = task_0.dataset_generator(datasource.get_random_article_text, out_type=out_type, inverse_order=xent_order_inverse)
     
     empty_tensor = torch.zeros((int(save_truncate), model_0.ctx_window)).int()
     generated_points = empty_tensor

@@ -1,62 +1,13 @@
 import os
 import json
-import random
 import pickle
 
 import torch
-from torch.utils.data import Dataset, DataLoader, random_split
 from datasets import load_dataset
 
+from xent import DataProcessor
+from xent.base import TokensDataset
 from xent.config import * 
-from xent.utils import * 
-from xent.lang import X
-
-
-###########################################
-####### GENERAL DATAPROCESSING ##################################
-###########################################
-
-class DataProcessor:
-        
-    def train_test_split(self, train_split = None):
-        """ Define a ratio to randomly split the dataset """
-        train_size = int(train_split * self.n_samples)
-        test_size = self.n_samples - train_size
-        self.train_set, self.test_set = random_split(self.dataset, [train_size, test_size])
-    
-    def exact_split(self, position):
-        """ Cut the dataset in a specific way """
-        self.train_set = self.dataset[:position]
-        self.test_set = self.dataset[position:]
-
-    def get_random_article(self):
-        return random.choice(self.database)
-
-    def get_random_article_text(self):
-        return random.choice(self.database)["text"]
-
-    def get_random_train_text(self):
-        return random.choice(self.train_set)["text"]
-
-    def get_random_test_text(self):
-        return random.choice(self.test_set)["text"]
-    
-    @classmethod
-    def pickle_dump(self, data, task_name, data_name, save_info=None):
-        task_dir = os.path.join(data_dir, task_name)
-        os.makedirs(task_dir, exist_ok=True)
-        save_path = os.path.join(task_dir, f"{data_name}.pkl")
-        with open(save_path, "wb") as f:
-            pickle.dump(data, f)
-        if save_info: self.save_info_json(save_info, task_dir)
-    
-    @classmethod
-    def save_info_json(self, save_info:dict, path:str):
-        save_path = os.path.join(path, "info.json")
-        json.dump(save_info, open(save_path, "w+"), indent=4)
-    
-
-
 
 
 #############################################
@@ -64,25 +15,25 @@ class DataProcessor:
 #############################################
 
 class Wikipedia(DataProcessor):
-    
     def __init__(self, split=None):
         self.database = load_dataset("wikipedia", "20220301.en", trust_remote_code=True)["train"]
         self.num_articles = len(self.database)
+        self.n = 0
         if isinstance(split, float):
             self.train_test_split(split)
+        
+    def get_next_article(self):
+        article = self.database[self.n]["text"]
+        self.n += 1
+        return article
 
-class SkeinAdventures(DataProcessor):
-    
+
+class SkeinAdventures(DataProcessor):    
     def __init__(self, split=None):
         self.database = load_dataset("ToastyPigeon/skein-text-adventures")["train"]
         self.num_articles = len(self.database)
         if isinstance(split, float):
             self.train_test_split(split)
-
-
-
-
-
 
 
 #######################################################
@@ -141,23 +92,3 @@ class SynthProcessor(DataProcessor):
         return TokensDataset(self.train_set), TokensDataset(self.test_set)
     
 
-
-
-
-#############################################
-########## HELPER DATAPROCESSING #############################################################
-#############################################
-
-class TokensDataset(Dataset):
-    def __init__(self, dataset: torch.Tensor):
-        self.dataset = dataset
-    def __len__(self):
-        return len(self.dataset)
-    def __getitem__(self, index):
-        return self.dataset[index]
-
-class TrainTestProcessor(Dataset):
-    def __init__(self, train_set, test_set):
-        self.train_set, self.test_set = train_set, test_set
-    def get_token_loaders(self):
-        return TokensDataset(self.train_set), TokensDataset(self.test_set)

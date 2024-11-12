@@ -7,8 +7,8 @@ import torch
 
 from xent.config import *
 from xent.tasks import Closure
-from xent.models import M
-from xent.dataprocessing import Wikipedia, DataProcessor
+from xent import M
+from xent.datasets import Wikipedia, DataProcessor
 
 
 task_name = "closure"
@@ -19,8 +19,9 @@ save_truncate = 1e6
 model_0 = M("gpt2", "M0", base="base") # load the base modelI
 datasource = Wikipedia()
 task_0 = Closure(model_0)
+xent_order_invert = False
 
-dataset_generator = task_0.dataset_generator(datasource.get_random_article_text, out_type="tensor")
+dataset_generator = task_0.dataset_generator(datasource.get_random_article_text, out_type="tensor", inverse_order=xent_order_invert)
 
 save_checkpoint = 9
 empty_tensor = torch.zeros((int(save_truncate), model_0.ctx_window)).int() # make sure it's int or you get floats in it for some reason

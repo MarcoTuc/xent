@@ -1,0 +1,1 @@
+sistemare lo split del dataset di wikipedia per usarlo negli script parallel forward e parallel backward nella cartella generators. 

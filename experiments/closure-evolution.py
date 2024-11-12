@@ -12,7 +12,7 @@ from torch.optim.lr_scheduler import LinearLR
 
 from xent.config import *
 from xent.models import M
-from xent.dataprocessing import Wikipedia
+from xent.datasets import Wikipedia
 from xent.tasks import Closure
 from xent.trainer import Trainer, Evolver
 

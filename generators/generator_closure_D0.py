@@ -8,7 +8,7 @@ import torch
 
 from xent.tasks import Closure
 from xent.models import M
-from xent.dataprocessing import Wikipedia, DataProcessor
+from xent.datasets import Wikipedia, DataProcessor
 
 
 task_name = "closure"

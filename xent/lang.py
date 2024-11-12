@@ -47,3 +47,5 @@ class X:
             "blue": blue,
         }
         return cls.xmap("def red-blue([{y0}, {y1}], {red}, {blue}):".format(**elems))
+    
+    

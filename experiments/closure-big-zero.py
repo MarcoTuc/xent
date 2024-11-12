@@ -9,7 +9,7 @@ from tqdm import tqdm
 from torch.optim import AdamW
 
 from xent.models import M
-from xent.dataprocessing import SynthProcessor
+from xent.datasets import SynthProcessor
 from xent.trainer import Trainer
 
 project_name = "closure-longtraining"

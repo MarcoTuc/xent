@@ -1,6 +1,5 @@
 import os
 import json
-from time import time
 from tqdm import tqdm
 
 import wandb
@@ -12,8 +11,8 @@ from torch.nn import CrossEntropyLoss
 
 from xent.config import * 
 from xent.lang import X
-from xent.models import M
-from xent.dataprocessing import SynthProcessor
+from xent import M, X
+from xent.datasets import SynthProcessor
 
 class Trainer():
 
