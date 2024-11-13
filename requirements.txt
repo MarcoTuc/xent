@@ -88,6 +88,6 @@ wandb==0.18.3
 wcwidth==0.2.13
 # Editable Git install (xent==0.1) with either a deleted local remote or invalid URI:
 # 'pi@futurarium.io:~/xent'
--e /home/tuccio/xent-futurarium
+# -e /home/tuccio/xent-futurarium
 xxhash==3.5.0
 yarl==1.15.2
