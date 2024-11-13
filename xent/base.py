@@ -252,14 +252,14 @@ class DataProcessor:
     
     def exact_split(self, position):
         """ Cut the dataset in a specific way """
-        self.train_set = self.database[:position]
-        self.test_set = self.database[position:]
+        self.train_set = self.dataset[:position]
+        self.test_set = self.dataset[position:]
 
     def get_random_article(self):
-        return random.choice(self.database)
+        return random.choice(self.dataset)
 
     def get_random_article_text(self):
-        return random.choice(self.database)["text"]
+        return random.choice(self.dataset)["text"]
 
     def get_random_train_text(self):
         return random.choice(self.train_set)["text"]

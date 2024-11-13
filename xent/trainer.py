@@ -45,12 +45,14 @@ class Trainer():
         else: self.sample_interval = sample_interval
         # we'll load a number of eval_size when doing evaluation
         self.eval_size = min(eval_size, len(self.D.test_set)) 
-        # tokenize the dataset if it is made of text. You should flag this in the info.json of the data you generate.
-        if self.D._info["data_content"] == "text":
-            tqdm.write("Tokenizing the training set:\n")
-            self.D.train_set = self.tokenize_dataset(self.D.train_set)
-            tqdm.write("Tokenizing the test set:\n")
-            self.D.test_set = self.tokenize_dataset(self.D.test_set)
+        
+        # # # DEPRECATED # # #
+        # # tokenize the dataset if it is made of text. You should flag this in the info.json of the data you generate.
+        # if self.D._info["data_content"] == "text":
+        #     tqdm.write("Tokenizing the training set:\n")
+        #     self.D.train_set = self.tokenize_dataset(self.D.train_set)
+        #     tqdm.write("Tokenizing the test set:\n")
+        #     self.D.test_set = self.tokenize_dataset(self.D.test_set)
         
         # make the actual split
         self.train_set, self.test_set = self.D.get_token_loaders()
