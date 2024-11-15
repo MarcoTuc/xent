@@ -1,0 +1,15 @@
+# Basic image for my training jobs. If I want to add some global stuff, do it here.
+FROM nvcr.io/nvidia/pytorch:24.10-py3
+
+RUN groupadd csft --gid 10776
+RUN useradd -m -s /bin/bash -g csft -u 396376 marktas
+RUN usermod -aG sudo marktas
+RUN mkdir -p /home/marktas
+RUN chown -R marktas:csft /home/marktas
+RUN echo "marktas:janenba" | chpasswd
+
+RUN apt-get update 
+RUN apt-get upgrade -y
+
+WORKDIR /home/marktas
+

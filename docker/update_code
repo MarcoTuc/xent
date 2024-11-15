@@ -1,0 +1,13 @@
+FROM xentbase:v2
+
+ENV XENT_DATA_PATH="/home/marktas/storage/marco/data"
+ENV XENT_MODELS_PATH="/home/marktas/storage/marco/models"
+
+RUN rm -rf /home/marktas/*
+COPY . /home/marktas
+
+USER root
+RUN chown -R marktas:csft /home/marktas
+USER marktas
+
+

@@ -34,10 +34,10 @@ class M():
         self.model_version = model_version
         self.base = base
 
-        task_models_dir = os.path.join(work_dir, "models", base)
+        task_models_dir = os.path.join(models_dir, base)
         model_path = os.path.join(task_models_dir, model_name, model_version)     
 
-        base_models_dir = os.path.join(work_dir, "models", "base")
+        base_models_dir = os.path.join(models_dir, "base")
         tokenizer_path = os.path.join(base_models_dir, model_name, "M0") # tokenizer is contained in the original version
         
         config = AutoConfig.from_pretrained(model_path)

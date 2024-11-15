@@ -1,1 +1,1 @@
-sistemare lo split del dataset di wikipedia per usarlo negli script parallel forward e parallel backward nella cartella generators. 
+sistemare il cuda driver che viene installato dal dockerfile new_requirements perchè sul cluster ho il 12.6 mentre il dockerfile installa il 12.1 e vanno in conflitto. 
