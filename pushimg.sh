@@ -1,4 +1,3 @@
-
 #!/bin/bash
 
 # get the name to give the new image

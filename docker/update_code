@@ -1,4 +1,4 @@
-FROM xentbase:v2
+FROM xentbase:base
 
 ENV XENT_DATA_PATH="/home/marktas/storage/marco/data"
 ENV XENT_MODELS_PATH="/home/marktas/storage/marco/models"
@@ -9,5 +9,3 @@ COPY . /home/marktas
 USER root
 RUN chown -R marktas:csft /home/marktas
 USER marktas
-
-

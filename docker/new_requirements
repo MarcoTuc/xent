@@ -1,6 +1,6 @@
 # this takes the base image and creates a new version with the basic packages
 
-FROM base:v0
+FROM base:base
 
 COPY . /home/marktas
 
@@ -9,7 +9,7 @@ USER root
 RUN apt-get install sudo 
 RUN apt-get install ncdu 
 RUN pip install nvitop
-RUN pip install -r requirements.txt
+RUN pip install -r clean_requirements.txt
 RUN python setup.py develop
 RUN chown -R marktas:csft /home/marktas
 
