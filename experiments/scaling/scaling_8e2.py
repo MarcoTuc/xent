@@ -8,7 +8,7 @@ from tqdm import tqdm
 
 from torch.optim import AdamW
 
-from xent.models import M
+from xent import M
 from xent.datasets import SynthProcessor
 from xent.trainer import Trainer
 

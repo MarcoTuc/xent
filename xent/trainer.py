@@ -10,7 +10,6 @@ from torch.nn.utils import clip_grad_norm_
 from torch.nn import CrossEntropyLoss
 
 from xent.config import * 
-from xent.lang import X
 from xent import M, X
 from xent.datasets import SynthProcessor
 

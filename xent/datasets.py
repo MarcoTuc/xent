@@ -4,6 +4,7 @@
 import os
 import json
 import pickle
+from tqdm import tqdm
 
 import torch
 from datasets import load_dataset
@@ -49,21 +50,21 @@ class SynthProcessor(DataProcessor):
 
     def __init__(
             self,
-            dataset_task,
+            base,
             dataset_name,
             train_split=None,
             split_posit=None,
             cut_dataset=None,
             cut_trainset=None,
+            files_to_load=None,
             ):
         
-        self.task_name = dataset_task
+        self.base = base
         self.data_name = dataset_name
 
-        self._path = os.path.join(data_dir, dataset_task, dataset_name)
+        self._path = os.path.join(data_dir, base, dataset_name)
         self._info = json.load(open(os.path.join(self._path, "info.json"), "r+"))
         self.train_split = train_split
-        self.dataset = self.load_pickled_dataset()
         self.cut_dataset = cut_dataset
         
         # to cut the whole dataset
@@ -78,14 +79,19 @@ class SynthProcessor(DataProcessor):
         # after splitting, if you want to cut the training set 
         if cut_trainset:
             self.train_set = self.train_set[:cut_trainset]
+        
+        self.files_to_load = files_to_load
 
-
+        self.dataset = self.load_pickled_dataset()
+    
+    
     def load_pickled_dataset(self):
         data_files = [f for f in os.listdir(self._path) if f.endswith(".pkl")]
+        if self.files_to_load: data_files = data_files[:self.files_to_load]
         output = []
-        for file in data_files: 
+        for file in tqdm(data_files, desc="Loading data files"): 
             with open(os.path.join(self._path, f"{file}"), "rb") as data:
-                if self._info["data_type"] == "tokens": output.append(pickle.load(data))
+                if self._info["data_type"] == "tokens": output.append(pickle.load(data).to("cpu")) # safety measure since many guys are initialized to be on the gpu (my bad)
                 elif self._info["data_type"] == "list": output.extend(pickle.load(data))
         if self._info["data_type"] == "tokens": output = torch.cat(output)
         self.n_samples = len(output)

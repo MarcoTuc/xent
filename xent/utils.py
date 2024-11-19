@@ -1,3 +1,6 @@
+import math
+scalinglaws_lr_function = lambda n: 0.003239 - (0.0001395 * math.log(n))
+
 class Tee(object):
     """ So you want to print on a txt file instead of terminal, here you have it.
         
