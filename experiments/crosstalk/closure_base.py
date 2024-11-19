@@ -5,7 +5,8 @@ import wandb
 from tqdm import tqdm 
 
 import torch
-from torch.optim import AdamW 
+from torch.optim import AdamW
+from torch.optim.lr_scheduler import LinearLR
 
 from xent import M, T
 from xent.datasets import SynthProcessor
@@ -27,7 +28,8 @@ wandb_name = f"{project_name}_{experiment_name}_{launched_on}"
 # define model to train
 base_model = "gpt2"
 model_version = "M0"
-new_model = "gpt2-base2closure"
+new_model_base = "crosstalk"
+new_model_name = "gpt2-base2closure"
 
 # define the training data
 base_data = "parallel_parallel"
@@ -46,7 +48,7 @@ eval_size = eval_for*batch_size #data samples in an eval
 # define the optimization
 nparams_gpt2 = 124e6
 learning_rate = 6.4e-4 #scalinglaws_lr_function(nparams_gpt2)
-warmup_steps = 3000
+warmup_steps = 3000 #very simple linear warmup
 
 epochs = 1
 
@@ -72,3 +74,46 @@ optimizer = AdamW(
     model.model.parameters(),
     lr=learning_rate)
 
+scheduler = LinearLR(
+    optimizer,
+    start_factor=0,
+    end_factor=1,
+    total_iters=warmup_steps
+)
+
+trainer = T(
+    model=model,
+    train_set=train_set,
+    test_set=test_set,
+    optimizer=optimizer,
+    batch_size=batch_size,
+    eval_size=eval_size,
+    log_interval=train_for,
+    make_samples=True,
+    sample_interval=sample_every
+)
+
+saving_options = {
+    "base": new_model_base,
+    "new_version": new_model_name
+}
+
+wandb.init(
+    project=project_name,
+    name=wandb_name,
+    config={
+        "model": base_model,
+        "model_version": model_version,
+        "synth_base": base_data,
+        "data_task": data_task
+    }
+)
+
+for epoch in range(epochs):
+    trainer.train_with_validation(
+        saving_options=saving_options,
+        tot_epochs=epochs
+    )
+    trainer.update_epoch(1)
+
+wandb.finish()

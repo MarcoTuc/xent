@@ -20,7 +20,8 @@ class Trainer():
     def __init__(
             self, 
             initial_model: M,
-            synthset: SynthProcessor,
+            train_set, 
+            test_set,
             optimizer,
             batch_size,
             scheduler=None,
@@ -35,7 +36,7 @@ class Trainer():
         
         # initialize model and data
         self.M = initial_model
-        self.D = synthset
+        self.train_set, self.test_set = train_set, test_set
         
         # define data-processing relevant parameters
         self.batch_size = batch_size
@@ -44,17 +45,6 @@ class Trainer():
         else: self.sample_interval = sample_interval
         # we'll load a number of eval_size when doing evaluation
         self.eval_size = min(eval_size, len(self.D.test_set)) 
-        
-        # # # DEPRECATED # # #
-        # # tokenize the dataset if it is made of text. You should flag this in the info.json of the data you generate.
-        # if self.D._info["data_content"] == "text":
-        #     tqdm.write("Tokenizing the training set:\n")
-        #     self.D.train_set = self.tokenize_dataset(self.D.train_set)
-        #     tqdm.write("Tokenizing the test set:\n")
-        #     self.D.test_set = self.tokenize_dataset(self.D.test_set)
-        
-        # make the actual split
-        self.train_set, self.test_set = self.D.get_token_loaders()
         
         # pick batch sized samples and feeds them to the training and evaluation loop
         self.train_loader = DataLoader(
