@@ -44,7 +44,7 @@ class Trainer():
         if sample_interval == None: self.sample_interval = log_interval
         else: self.sample_interval = sample_interval
         # we'll load a number of eval_size when doing evaluation
-        self.eval_size = min(eval_size, len(self.D.test_set)) 
+        self.eval_size = min(eval_size, len(self.test_set)) 
         
         # pick batch sized samples and feeds them to the training and evaluation loop
         self.train_loader = DataLoader(
@@ -85,6 +85,8 @@ class Trainer():
         self.best_loss = float("inf")
         self.epoch = epoch
 
+        self.train_checkpoint = 0 
+
         # report the generated samples on wandb
         if make_samples:
             self.gen_table = []
@@ -110,7 +112,6 @@ class Trainer():
             losses = torch.cat([losses, loss.unsqueeze(0)])
             if batch % self.log_interval == 0:
                 avg_loss = losses.mean().item()
-                # wandb.log({"avg_loss": avg_loss})
                 if self.make_samples: 
                     prompt, gen_sample = self.gen_in_loop(split=True)
                     self.gen_table.append([avg_loss, prompt, gen_sample])
@@ -123,7 +124,7 @@ class Trainer():
                             )
                 losses = self.empty_lossess
     
-    def train_with_validation(self, saving_options=None, tot_epochs=None):
+    def train_with_validation(self, saving_options=None, tot_epochs=None, saving_info=None):
         self.M.model.train()
         sampling_loss = self.empty_lossess
         total_loss = self.empty_lossess
@@ -152,10 +153,11 @@ class Trainer():
             if batch % self.log_interval == 0: # use log interval as validation interval here
                 avg_loss = total_loss.mean().item()
                 wandb.log({"train_loss": avg_loss}) # log the train_loss
-                self.evaluate(saving_options=saving_options) # will also log the validation loss
+                self.evaluate(saving_options=saving_options, saving_info=saving_info) # will also log the validation loss
                 total_loss = self.empty_lossess
+            self.train_checkpoint += 1
 
-    def evaluate(self, saving_options=None):
+    def evaluate(self, saving_options=None, saving_info=None):
         tqdm.write("Evaluating the model... ")
         self.M.model.eval()
         valloss = self.empty_lossess
@@ -173,7 +175,7 @@ class Trainer():
             if val_loss < self.best_loss:
                 self.best_loss = val_loss
                 if saving_options:
-                    self.save_model(**saving_options)
+                    self.save_model(**saving_options, saving_info=saving_info)
         self.M.model.train()
 
     def gen_in_loop(self, split=False):
@@ -211,8 +213,8 @@ class Trainer():
             tqdm.write(f"Error in the data, skipping... \n{e}")
             return None # then skip this in the main loop
         for sample, fstart in xidx:
-            shift = 0 # KEEP 0 --- change for debugging purposes
-            xstart = fstart + xlen - shift
+            # shift = 0 # KEEP 0 --- change for debugging purposes
+            xstart = fstart + xlen #- shift
             sample_logits = logits[sample, xstart:-1].view(-1, logits.size(-1)) # [T, V]
             sample_tokens = tokens[sample, xstart+1:].view(-1).long() # [T]
             loss += self.crossentropy(sample_logits, sample_tokens)
@@ -242,36 +244,32 @@ class Trainer():
     ################################
     ######### LOAD / SAVE FACILITIES
 
-    def save_model(self, base=None, model_name=None, new_version=None):
+    def save_model(self, base=None, model_name=None, new_version=None, saving_info=None):
         if base == None: 
-            base = self.D.dataset_task 
+            raise Exception("dude provide a base in a dictionary to pass as saving_options")
         if model_name == None: 
-            model_name = self.M.model_name
+            raise Exception("dude provide a model_name in a dictionary to pass as saving_options")
         if new_version == self.M.model_version:
-            new_version = f"{new_version}+1"
-            tqdm.write(f"New version is the same as old version, changing name to: {new_version}")
+            raise Exception("dude provide a model_version  in a dictionary to pass as saving_options")
         save_path = os.path.join(models_dir, base, model_name, new_version)
         model_save_path = os.path.join(save_path, new_version)
         tqdm.write(f"Saving new model into: {model_save_path}")
         os.makedirs(save_path, exist_ok=True)
         torch.save(self.M.model, model_save_path)
-        self.save_info(save_path)
+        self.save_info(save_path, saving_info)
 
-    def save_info(self, path):
+    def save_info(self, path, saving_info):
         save = {
             "model_trained_from": {
                 "base": self.M.base,
                 "name": self.M.model_name,
                 "version": self.M.model_version
             },
-            "model_trained_on": {
-                "task": self.D.task_name,
-                "data": self.D.data_name,
-                "cut_dataset": self.D.cut_dataset
-            },
+            "saving_info": saving_info,
             "training_status": {
                 "validation_loss": self.best_loss,
                 "training_epoch": self.epoch,
+                "training_checkpoint": self.train_checkpoint,
             }
         }
         print(f"Validation loss: {self.best_loss:.3f} || Epoch: {self.epoch}")

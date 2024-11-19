@@ -39,7 +39,7 @@ train_size = 3000000 # 3 million go to training
 test_size = 400000 # 400k go to testing
 
 # define the training loop
-batch_size = 16 #data per training step
+batch_size = 15 #data per training step
 train_for = 500 #training steps in between each evaluation
 eval_for = 75 #eval steps in between each training loop -- 1200 random samples for each evaluation
 sample_every = 1000 #generate a sample every number of training steps
@@ -76,13 +76,13 @@ optimizer = AdamW(
 
 scheduler = LinearLR(
     optimizer,
-    start_factor=0,
+    start_factor=1e-9,
     end_factor=1,
     total_iters=warmup_steps
 )
 
 trainer = T(
-    model=model,
+    initial_model=model,
     train_set=train_set,
     test_set=test_set,
     optimizer=optimizer,
@@ -95,23 +95,31 @@ trainer = T(
 
 saving_options = {
     "base": new_model_base,
+    "model_name": base_model,
     "new_version": new_model_name
 }
+
+saving_info = {
+        "model": base_model,
+        "model_version": model_version,
+        "synth_base": base_data,
+        "data_task": data_task,
+        "data_samples": dataset_size,
+        "train_samples": train_size,
+        "test_samples": test_size,
+        "message": message_in_a_bottle
+    }
 
 wandb.init(
     project=project_name,
     name=wandb_name,
-    config={
-        "model": base_model,
-        "model_version": model_version,
-        "synth_base": base_data,
-        "data_task": data_task
-    }
+    config=saving_info
 )
 
 for epoch in range(epochs):
     trainer.train_with_validation(
         saving_options=saving_options,
+        saving_info=saving_info,
         tot_epochs=epochs
     )
     trainer.update_epoch(1)

@@ -1,4 +1,4 @@
-#!/bin/bash
+# !/bin/bash
 
 # get the name to give the new image
 while getopts "n:t:" arg; do
@@ -7,6 +7,11 @@ while getopts "n:t:" arg; do
     t) tag=$OPTARG;;
   esac
 done
+
+if [ -z "$tag" ]; then
+    tag=$name
+fi
+
 
 runai submit \
     --name $name \
@@ -17,6 +22,6 @@ runai submit \
     --run-as-uid 396376  \
     --run-as-gid 10776 \
     --existing-pvc claimname=csft-scratch,path=/home/marktas/storage \
-    --command -- python experiments/scaling/scaling_8e6.py \
-    --interactive \
+    --command -- python experiments/crosstalk/ranking_base.py \
+    # --interactive \
     # --attach
