@@ -1,0 +1,1 @@
+Here I'm training llama3.2-1B on closure and ranking of tokens given crossentropies from GPT2. Basically I'm using the same parallel_parallel dataset that I generated with GPT2 but training it on llama to see what happens. 
