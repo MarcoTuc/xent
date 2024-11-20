@@ -31,6 +31,7 @@ class Trainer():
             make_samples:bool=True,
             sample_interval=None,
             grad_clip:float=1.0,
+            report_wandb=True,
             epoch=0,
             ):
         
@@ -77,8 +78,9 @@ class Trainer():
             self.scheduler = scheduler 
             self._do_schedule = True
         else: 
-            self.scheduler = scheduler 
             self._do_schedule = False
+        
+        self.wandb = report_wandb
         
         # track loss for wandb reporting and model-saving purposes
         self.empty_lossess = torch.tensor([]).to(device)
@@ -108,14 +110,16 @@ class Trainer():
             loss.backward()
             clip_grad_norm_(self.M.model.parameters(), self.grad_clip)
             self.optimizer.step()
-            if self._do_schedule: self.scheduler.step()
+            if self._do_schedule: 
+                wandb.log({"learning_rate": self.scheduler.get_last_lr()[0]})
+                self.scheduler.step()
             losses = torch.cat([losses, loss.unsqueeze(0)])
             if batch % self.log_interval == 0:
                 avg_loss = losses.mean().item()
                 if self.make_samples: 
                     prompt, gen_sample = self.gen_in_loop(split=True)
                     self.gen_table.append([avg_loss, prompt, gen_sample])
-                    wandb.log({"generated_samples": wandb.Table(
+                    if self.wandb: wandb.log({"generated_samples": wandb.Table(
                                         columns=["loss", "prompt", "output"],
                                         data=self.gen_table,
                                         allow_mixed_types=True
@@ -137,7 +141,9 @@ class Trainer():
             loss.backward()
             clip_grad_norm_(self.M.model.parameters(), self.grad_clip)
             self.optimizer.step()
-            if self._do_schedule: self.scheduler.step()
+            if self._do_schedule: 
+                wandb.log({"learning_rate": self.scheduler.get_last_lr()[0]})
+                self.scheduler.step()
             sampling_loss = torch.cat([sampling_loss, loss.unsqueeze(0)])
             total_loss = torch.cat([total_loss, loss.unsqueeze(0)])
             if self.make_samples and batch % self.sample_interval == 0:
@@ -145,14 +151,14 @@ class Trainer():
                 prompt, gen_sample = self.gen_in_loop(split=True)
                 self.gen_table.append([avg_sample_loss, prompt, gen_sample])
                 sampling_loss = self.empty_lossess
-                wandb.log({"generated_samples": wandb.Table(
+                if self.wandb: wandb.log({"generated_samples": wandb.Table(
                                     columns=["loss", "prompt", "output"],
                                     data=self.gen_table,
                                     allow_mixed_types=True
                                 )})
             if batch % self.log_interval == 0: # use log interval as validation interval here
                 avg_loss = total_loss.mean().item()
-                wandb.log({"train_loss": avg_loss}) # log the train_loss
+                if self.wandb: wandb.log({"train_loss": avg_loss}) # log the train_loss
                 self.evaluate(saving_options=saving_options, saving_info=saving_info) # will also log the validation loss
                 total_loss = self.empty_lossess
             self.train_checkpoint += 1
@@ -171,7 +177,7 @@ class Trainer():
                 if batch == self.testing_steps:
                     break
             val_loss = valloss.mean().item()
-            wandb.log({"validation_loss": val_loss})
+            if self.wandb: wandb.log({"validation_loss": val_loss})
             if val_loss < self.best_loss:
                 self.best_loss = val_loss
                 if saving_options:

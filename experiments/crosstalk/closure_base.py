@@ -1,4 +1,5 @@
 import os
+import sys
 from datetime import datetime
 
 import wandb
@@ -10,7 +11,7 @@ from torch.optim.lr_scheduler import LinearLR
 
 from xent import M, T
 from xent.datasets import SynthProcessor
-from xent.utils import scalinglaws_lr_function
+from xent.utils import scalinglaws_lr_function, Tee
 
 launched_on = datetime.now().strftime('%d-%b_%H:%M')
 message_in_a_bottle = """
@@ -18,6 +19,8 @@ message_in_a_bottle = """
 Training GPT2-base on 3e6 closure samples
 
 """
+
+use_wandb = True
 
 SEED = 21
 
@@ -28,7 +31,7 @@ wandb_name = f"{project_name}_{experiment_name}_{launched_on}"
 # define model to train
 base_model = "gpt2"
 model_version = "M0"
-new_model_base = "crosstalk"
+new_model_base = "crosstalk-cluster"
 new_model_name = "gpt2-base2closure"
 
 # define the training data
@@ -39,21 +42,27 @@ train_size = 3000000 # 3 million go to training
 test_size = 400000 # 400k go to testing
 
 # define the training loop
-batch_size = 15 #data per training step
-train_for = 500 #training steps in between each evaluation
-eval_for = 75 #eval steps in between each training loop -- 1200 random samples for each evaluation
-sample_every = 1000 #generate a sample every number of training steps
+batch_size = 40 #data per training step
+train_for = 100 #training steps in between each evaluation
+eval_for = 30 #eval steps in between each training loop -- 1200 random samples for each evaluation
+sample_every = 500 #generate a sample every number of training steps
 eval_size = eval_for*batch_size #data samples in an eval
 
 # define the optimization
 nparams_gpt2 = 124e6
-learning_rate = 6.4e-4 #scalinglaws_lr_function(nparams_gpt2)
+learning_rate = 6.3e-4 #scalinglaws_lr_function(nparams_gpt2)
 warmup_steps = 3000 #very simple linear warmup
 
 epochs = 1
 
 
 ##########################################################
+stdout_dir = os.path.join(os.getenv("XENT_MODELS_PATH"), new_model_base, base_model, new_model_name, "console.txt")
+os.makedirs(os.path.dirname(stdout_dir), exist_ok=True)
+f = open(stdout_dir, "w+")
+sys.stdout = Tee(f) 
+sys.stderr = Tee(f)
+
 torch.manual_seed(SEED)
 
 model = M(base_model, model_version)
@@ -86,11 +95,13 @@ trainer = T(
     train_set=train_set,
     test_set=test_set,
     optimizer=optimizer,
+    scheduler=scheduler,
     batch_size=batch_size,
     eval_size=eval_size,
     log_interval=train_for,
     make_samples=True,
-    sample_interval=sample_every
+    sample_interval=sample_every,
+    report_wandb=use_wandb
 )
 
 saving_options = {
@@ -110,10 +121,11 @@ saving_info = {
         "message": message_in_a_bottle
     }
 
-wandb.init(
-    project=project_name,
-    name=wandb_name,
-    config=saving_info
+if use_wandb:
+    wandb.init(
+        project=project_name,
+        name=wandb_name,
+        config=saving_info
 )
 
 for epoch in range(epochs):
@@ -124,4 +136,4 @@ for epoch in range(epochs):
     )
     trainer.update_epoch(1)
 
-wandb.finish()
+if use_wandb: wandb.finish()
