@@ -61,7 +61,7 @@ stdout_dir = os.path.join(os.getenv("XENT_MODELS_PATH"), new_model_base, base_mo
 os.makedirs(os.path.dirname(stdout_dir), exist_ok=True)
 f = open(stdout_dir, "w+")
 sys.stdout = Tee(f) 
-sys.stderr = Tee(f)
+# sys.stderr = Tee(f)
 
 torch.manual_seed(SEED)
 
