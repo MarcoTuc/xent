@@ -148,11 +148,11 @@ class Trainer():
             total_loss = torch.cat([total_loss, loss.unsqueeze(0)])
             if self.make_samples and batch % self.sample_interval == 0:
                 avg_sample_loss = sampling_loss.mean().item()
-                prompt, gen_sample = self.gen_in_loop(split=True)
-                self.gen_table.append([avg_sample_loss, prompt, gen_sample])
+                prompt, gen_sample, true = self.gen_in_loop(split=True)
+                self.gen_table.append([avg_sample_loss, prompt, gen_sample, true])
                 sampling_loss = self.empty_lossess
                 if self.wandb: wandb.log({"generated_samples": wandb.Table(
-                                    columns=["loss", "prompt", "output"],
+                                    columns=["loss", "prompt", "output", "true"],
                                     data=self.gen_table,
                                     allow_mixed_types=True
                                 )})
@@ -190,6 +190,7 @@ class Trainer():
         xidx, xlen = self.find_xstring(sample, X.xreturn, return_len=True)
         xstart = xidx[1] + xlen
         prompt = sample[0, :xstart]
+        true = sample[0, xstart:]
         attn_mask = torch.ones_like(prompt)
         with torch.no_grad():
             gen = self.M.model.generate(
@@ -204,7 +205,8 @@ class Trainer():
         if split:
             output = self.M.detokenize(gen[0, len(prompt):], mode="tensor")
             prompt = self.M.detokenize(prompt, "tensor")
-            return prompt, output
+            true = self.M.detokenize(true, "tensor")
+            return prompt, output, true
         else:
             return self.M.detokenize(gen[0], mode="tensor")
 
