@@ -24,12 +24,15 @@ class M():
 
     def __init__(
             self, 
-            model_name: str, 
-            model_version: str,
-            base: str = "base",
-            reinitialize: bool = False
+            base=None,
+            model_name=None, 
+            model_version=None,
+            reinitialize=False,
+            init_from_path=None
             ):
         
+        if base and not init_from_path: self.base = "base"
+
         self.model_name = model_name
         self.model_version = model_version
         self.base = base
@@ -40,7 +43,10 @@ class M():
         base_models_dir = os.path.join(models_dir, "base")
         tokenizer_path = os.path.join(base_models_dir, model_name, "M0") # tokenizer is contained in the original version
         
-        config = AutoConfig.from_pretrained(model_path)
+        print("tokenizer path:", tokenizer_path)
+        print("model path:", model_path)
+        
+        config = AutoConfig.from_pretrained(tokenizer_path)
         config.use_cache = False # disable KV-caching during training
 
         if reinitialize: # load only model shape and randomly initialized weights  

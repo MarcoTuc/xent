@@ -22,6 +22,6 @@ runai submit \
     --run-as-uid 396376  \
     --run-as-gid 10776 \
     --existing-pvc claimname=csft-scratch,path=/home/marktas/storage \
-    --interactive \
-    --attach
-    # --command -- python experiments/crosstalk/ranking_base.py \
+    --command -- python experiments/crosstalk/ranking_closure.py \
+    # --interactive \
+    # --attach

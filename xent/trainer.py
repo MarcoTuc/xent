@@ -22,8 +22,8 @@ class Trainer():
             initial_model: M,
             train_set, 
             test_set,
-            optimizer,
-            batch_size,
+            optimizer=None,
+            batch_size=None,
             scheduler=None,
             shuffle=False, 
             log_interval:int=10,
@@ -178,6 +178,7 @@ class Trainer():
                     break
             val_loss = valloss.mean().item()
             if self.wandb: wandb.log({"validation_loss": val_loss})
+            else: print("validation loss:", val_loss)
             if val_loss < self.best_loss:
                 self.best_loss = val_loss
                 if saving_options:
@@ -188,14 +189,16 @@ class Trainer():
         self.M.model.eval()
         sample = next(iter(self.gen_loader)).to(device)
         xidx, xlen = self.find_xstring(sample, X.xreturn, return_len=True)
-        xstart = xidx[1] + xlen
-        prompt = sample[0, :xstart]
-        true = sample[0, xstart:]
+        # print(sample)
+        xstart = xidx[1] + xlen + 1
+        prompt = sample[:, :xstart]
+        true = sample[:, xstart:]
+        # print(true)
         attn_mask = torch.ones_like(prompt)
         with torch.no_grad():
             gen = self.M.model.generate(
-                prompt.unsqueeze(0), #TODO understand why I need this unsqueeze here to make it work
-                attention_mask=attn_mask.unsqueeze(0), #TODO understand why I need this unsqueeze here to make it work
+                prompt, #TODO understand why I need this unsqueeze here to make it work
+                attention_mask=attn_mask, #TODO understand why I need this unsqueeze here to make it work
                 do_sample=True,
                 temperature=1.0,
                 pad_token_id=self.M.model.config.eos_token_id,
@@ -203,10 +206,11 @@ class Trainer():
             )
         self.M.model.train()        
         if split:
-            output = self.M.detokenize(gen[0, len(prompt):], mode="tensor")
-            prompt = self.M.detokenize(prompt, "tensor")
-            true = self.M.detokenize(true, "tensor")
-            return prompt, output, true
+            lenprompt = len(prompt)
+            output = self.M.detokenize(gen[0, lenprompt:], mode="tensor")
+            prompt = self.M.detokenize(prompt[0], "tensor")
+            true = self.M.detokenize(true[0], "tensor")
+            return prompt, output, true, gen, lenprompt
         else:
             return self.M.detokenize(gen[0], mode="tensor")
 
@@ -221,8 +225,8 @@ class Trainer():
             tqdm.write(f"Error in the data, skipping... \n{e}")
             return None # then skip this in the main loop
         for sample, fstart in xidx:
-            # shift = 0 # KEEP 0 --- change for debugging purposes
-            xstart = fstart + xlen #- shift
+            shift = 0 # KEEP 0 --- change for debugging purposes
+            xstart = fstart + xlen + shift
             sample_logits = logits[sample, xstart:-1].view(-1, logits.size(-1)) # [T, V]
             sample_tokens = tokens[sample, xstart+1:].view(-1).long() # [T]
             loss += self.crossentropy(sample_logits, sample_tokens)
