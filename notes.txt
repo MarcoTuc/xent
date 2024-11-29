@@ -1,0 +1,6 @@
+Notes from nanoGPT: 
+
+- When finetuning a GPT you should use a lower learning rate than the one you use for pretraining. The learning rate from the scaling laws paper is for pretraining and that's what I'm using. Maybe the performance degradation on multiple tasks comes from having used a too high learning rate? I don't know if this is the only component but it may be a part of it. 
+
+- Looks like gradient accumulation is kinda important. 
+

@@ -105,7 +105,7 @@ class Trainer():
         for batch, tokens in enumerate(self.train_loader):
             self.optimizer.zero_grad()           
             logits = self.M.model(input_ids=tokens).logits
-            loss = self.compute_batch_loss(logits, tokens)
+            loss = self.compute_task_loss(logits, tokens)
             if loss == None: continue
             loss.backward()
             clip_grad_norm_(self.M.model.parameters(), self.grad_clip)
@@ -128,7 +128,8 @@ class Trainer():
                             )
                 losses = self.empty_lossess
     
-    def train_with_validation(self, saving_options=None, tot_epochs=None, saving_info=None):
+    def train_task(self, saving_options=None, tot_epochs=None, saving_info=None):
+        """ Trains on a xent task and perform validation as well """
         self.M.model.train()
         sampling_loss = self.empty_lossess
         total_loss = self.empty_lossess
@@ -136,8 +137,43 @@ class Trainer():
             self.optimizer.zero_grad()        
             tokens = tokens.to(device)   
             logits = self.M.model(input_ids=tokens).logits
-            loss = self.compute_batch_loss(logits, tokens)
+            loss = self.compute_task_loss(logits, tokens)
             if loss == None: continue
+            loss.backward()
+            clip_grad_norm_(self.M.model.parameters(), self.grad_clip)
+            self.optimizer.step()
+            if self._do_schedule: 
+                wandb.log({"learning_rate": self.scheduler.get_last_lr()[0]})
+                self.scheduler.step()
+            sampling_loss = torch.cat([sampling_loss, loss.unsqueeze(0)])
+            total_loss = torch.cat([total_loss, loss.unsqueeze(0)])
+            if self.make_samples and batch % self.sample_interval == 0:
+                avg_sample_loss = sampling_loss.mean().item()
+                prompt, gen_sample, true = self.gen_in_loop(split=True)
+                self.gen_table.append([avg_sample_loss, prompt, gen_sample, true])
+                sampling_loss = self.empty_lossess
+                if self.wandb: wandb.log({"generated_samples": wandb.Table(
+                                    columns=["loss", "prompt", "output", "true"],
+                                    data=self.gen_table,
+                                    allow_mixed_types=True
+                                )})
+            if batch % self.log_interval == 0: # use log interval as validation interval here
+                avg_loss = total_loss.mean().item()
+                if self.wandb: wandb.log({"train_loss": avg_loss}) # log the train_loss
+                self.evaluate(saving_options=saving_options, saving_info=saving_info) # will also log the validation loss
+                total_loss = self.empty_lossess
+            self.train_checkpoint += 1
+    
+    def pre_train(self, saving_options=None, tot_epochs=None, saving_info=None):
+        """ Trains on a xent task and perform validation as well """
+        self.M.model.train()
+        sampling_loss = self.empty_lossess
+        total_loss = self.empty_lossess
+        for batch, tokens in tqdm(enumerate(self.train_loader), desc=f"Training epoch {self.epoch+1}/{tot_epochs} || ", total=self.training_steps):
+            self.optimizer.zero_grad()        
+            tokens = tokens.to(device)   
+            logits = self.M.model(input_ids=tokens).logits
+            loss = self.crossentropy(logits.view(-1, logits.size(-1)), tokens.view(-1))
             loss.backward()
             clip_grad_norm_(self.M.model.parameters(), self.grad_clip)
             self.optimizer.step()
@@ -171,7 +207,7 @@ class Trainer():
             for batch, tokens in tqdm(enumerate(self.test_loader), desc="Testing batch || ", total=self.testing_steps):
                 tokens = tokens.to(device)
                 logits = self.M.model(input_ids=tokens).logits
-                loss = self.compute_batch_loss(logits, tokens)
+                loss = self.compute_task_loss(logits, tokens)
                 if loss == None: continue
                 valloss = torch.cat([valloss, loss.unsqueeze(0)])
                 if batch == self.testing_steps:
@@ -190,7 +226,7 @@ class Trainer():
         sample = next(iter(self.gen_loader)).to(device)
         xidx, xlen = self.find_xstring(sample, X.xreturn, return_len=True)
         # print(sample)
-        xstart = xidx[1] + xlen + 1
+        xstart = xidx[1] + xlen + 1 # the +1 is needed to append the \n character without with the model gets confused (...)
         prompt = sample[:, :xstart]
         true = sample[:, xstart:]
         # print(true)
@@ -206,15 +242,14 @@ class Trainer():
             )
         self.M.model.train()        
         if split:
-            lenprompt = len(prompt)
-            output = self.M.detokenize(gen[0, lenprompt:], mode="tensor")
+            output = self.M.detokenize(gen[0, prompt.shape[1]:], mode="tensor")
             prompt = self.M.detokenize(prompt[0], "tensor")
             true = self.M.detokenize(true[0], "tensor")
-            return prompt, output, true, gen, lenprompt
+            return prompt, output, true
         else:
             return self.M.detokenize(gen[0], mode="tensor")
 
-    def compute_batch_loss(
+    def compute_task_loss(
             self, 
             logits, # [B, T, V]
             tokens, # [B, T]

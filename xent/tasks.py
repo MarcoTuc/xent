@@ -66,7 +66,7 @@ class Closure(Task):
             get_sample: Callable,
         ):
 
-        """ This is a special generator for the parallel_parallel generator, see message string there """
+        """ This is a special generator for the parallel_parallel generator script, see message string there """
         
         share = int(1/5.1 * self.M.ctx_window)
         rescaling = 4

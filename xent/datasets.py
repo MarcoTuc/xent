@@ -92,7 +92,7 @@ class SynthProcessor(DataProcessor):
         for file in tqdm(data_files, desc="Loading data files"): 
             with open(os.path.join(self._path, f"{file}"), "rb") as data:
                 if self._info["data_type"] == "tokens": output.append(pickle.load(data).to("cpu")) # safety measure since many guys are initialized to be on the gpu (my bad)
-                elif self._info["data_type"] == "list": output.extend(pickle.load(data))
+                elif self._info["data_type"] == "list": output.extend(pickle.load(data).to("cpu"))
         if self._info["data_type"] == "tokens": output = torch.cat(output)
         self.n_samples = len(output)
         return output
