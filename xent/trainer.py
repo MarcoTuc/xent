@@ -90,9 +90,8 @@ class Trainer():
         self.train_checkpoint = 0 
 
         # report the generated samples on wandb
-        if make_samples:
-            self.gen_table = []
-            self.make_samples = make_samples
+        self.gen_table = []
+        self.make_samples = make_samples
         
         self.training_steps = len(self.train_set) / self.batch_size
         self.testing_steps = self.eval_size / self.batch_size
@@ -195,7 +194,7 @@ class Trainer():
             if batch % self.log_interval == 0: # use log interval as validation interval here
                 avg_loss = total_loss.mean().item()
                 if self.wandb: wandb.log({"train_loss": avg_loss}) # log the train_loss
-                self.evaluate(saving_options=saving_options, saving_info=saving_info) # will also log the validation loss
+                self.evaluate_pretrain(saving_options=saving_options, saving_info=saving_info) # will also log the validation loss
                 total_loss = self.empty_lossess
             self.train_checkpoint += 1
 
@@ -208,6 +207,28 @@ class Trainer():
                 tokens = tokens.to(device)
                 logits = self.M.model(input_ids=tokens).logits
                 loss = self.compute_task_loss(logits, tokens)
+                if loss == None: continue
+                valloss = torch.cat([valloss, loss.unsqueeze(0)])
+                if batch == self.testing_steps:
+                    break
+            val_loss = valloss.mean().item()
+            if self.wandb: wandb.log({"validation_loss": val_loss})
+            else: print("validation loss:", val_loss)
+            if val_loss < self.best_loss:
+                self.best_loss = val_loss
+                if saving_options:
+                    self.save_model(**saving_options, saving_info=saving_info)
+        self.M.model.train()
+
+    def evaluate_pretrain(self, saving_options=None, saving_info=None):
+        tqdm.write("Evaluating the model... ")
+        self.M.model.eval()
+        valloss = self.empty_lossess
+        with torch.no_grad():
+            for batch, tokens in tqdm(enumerate(self.test_loader), desc="Testing batch || ", total=self.testing_steps):
+                tokens = tokens.to(device)
+                logits = self.M.model(input_ids=tokens).logits
+                loss = self.crossentropy(logits.view(-1, logits.size(-1)), tokens.view(-1))
                 if loss == None: continue
                 valloss = torch.cat([valloss, loss.unsqueeze(0)])
                 if batch == self.testing_steps:

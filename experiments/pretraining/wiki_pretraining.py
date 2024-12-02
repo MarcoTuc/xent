@@ -9,6 +9,7 @@ import torch
 from torch.utils.data import Dataset
 from torch.optim import AdamW
 from torch.optim.lr_scheduler import LinearLR
+from torch.amp import autocast, GradScaler
 
 import datasets
 from datasets import load_dataset
@@ -26,7 +27,7 @@ Pretraining of GPT2-XL on Wikipedia
 """
 
 use_wandb = True
-log_intxt = True
+log_intxt = False
 
 SEED = 21
 
@@ -42,7 +43,7 @@ new_model_base = "pretrained"
 new_model_version = "gpt2-xl-wikipedia"
 
 # define the training loop
-batch_size = 40 #data per training step
+batch_size = 2 #data per training step
 train_for = 100 #training steps in between each evaluation
 eval_for = 30 #eval steps in between each training loop -- 1200 random samples for each evaluation
 sample_every = 500 #generate a sample every number of training steps
@@ -76,11 +77,12 @@ train_set = SynthProcessor(
 
 test_set = SynthProcessor(
     base="wiki90-tok",
-    dataset_name="test"
+    dataset_name="train"
 ).dataset
 
-train_set = torch.cat(train_set, dim=-1)
-test_set = torch.cat(test_set, dim=-1)
+train_set_cpu = torch.cat(train_set, dim=-1).to("cpu")
+test_set_cpu = torch.cat(test_set, dim=-1).to("cpu")
+del train_set; del test_set; torch.cuda.empty_cache()
 
 class Wikichunk(Dataset):
     def __init__(self, tensor, ctx=1024):
@@ -96,8 +98,8 @@ class Wikichunk(Dataset):
         chunk = self.data[idx:idx+self.ctx]
         return chunk
 
-train_set = Wikichunk(train_set, ctx=1024)
-test_set = Wikichunk(train_set, ctx=1024)
+train_set = Wikichunk(train_set_cpu, ctx=1024)
+test_set = Wikichunk(test_set_cpu, ctx=1024)
 
 optimizer = AdamW(
     model.model.parameters(),
@@ -144,15 +146,18 @@ if use_wandb:
         config=saving_info
     )
 
+scaler = GradScaler()
+
 iter = 0
-while True: 
-    trainer.pre_train(
-        saving_info=saving_info,
-        saving_options=saving_options
-    )
-    iter += 1
-    if iter == training_steps:
-        break
+with autocast("cuda"):
+    while True: 
+        trainer.pre_train(
+            saving_info=saving_info,
+            saving_options=saving_options
+        )
+        iter += 1
+        if iter == training_steps:
+            break
 
 if use_wandb: 
     wandb.finish()

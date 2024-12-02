@@ -72,6 +72,8 @@ class M():
             print("Model initialized without context_window.")
             print("Use the set_context_window method to set it or you'll get errors somewhere.")        
 
+        self.model.gradient_checkpointing_enable()
+
     def tokenize(
             self, 
             text: str,
