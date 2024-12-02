@@ -167,32 +167,21 @@ class Trainer():
         """ Trains on a xent task and perform validation as well """
         iter = 0
         self.M.model.train()
-        sampling_loss = self.empty_lossess
         total_loss = self.empty_lossess
-        bar = tqdm(total=steps, desc="Training steps")
+        bar = tqdm(total=steps, desc="Training steps", disable=True)
         for batch, tokens in enumerate(self.train_loader):
             self.optimizer.zero_grad()        
             tokens = tokens.to(device)   
             logits = self.M.model(input_ids=tokens).logits
             loss = self.crossentropy(logits.view(-1, logits.size(-1)), tokens.view(-1))
+            print("train loss shape:", loss.shape)
+            print("train loss:", loss.item())
             loss.backward()
             clip_grad_norm_(self.M.model.parameters(), self.grad_clip)
             self.optimizer.step()
             if self._do_schedule: 
                 wandb.log({"learning_rate": self.scheduler.get_last_lr()[0]})
                 self.scheduler.step()
-            sampling_loss = torch.cat([sampling_loss, loss.unsqueeze(0)])
-            total_loss = torch.cat([total_loss, loss.unsqueeze(0)])
-            if self.make_samples and batch % self.sample_interval == 0:
-                avg_sample_loss = sampling_loss.mean().item()
-                prompt, gen_sample, true = self.gen_in_loop(split=True)
-                self.gen_table.append([avg_sample_loss, prompt, gen_sample, true])
-                sampling_loss = self.empty_lossess
-                if self.wandb: wandb.log({"generated_samples": wandb.Table(
-                                    columns=["loss", "prompt", "output", "true"],
-                                    data=self.gen_table,
-                                    allow_mixed_types=True
-                                )})
             if batch % self.log_interval == 0: # use log interval as validation interval here
                 avg_loss = total_loss.mean().item()
                 if self.wandb: wandb.log({"train_loss": avg_loss}) # log the train_loss
@@ -230,10 +219,12 @@ class Trainer():
         self.M.model.eval()
         valloss = self.empty_lossess
         with torch.no_grad():
-            for batch, tokens in tqdm(enumerate(self.test_loader), desc="Testing batch || ", total=self.testing_steps):
+            for batch, tokens in tqdm(enumerate(self.test_loader), desc="Testing batch || ", total=self.testing_steps, disable=True):
                 tokens = tokens.to(device)
                 logits = self.M.model(input_ids=tokens).logits
                 loss = self.crossentropy(logits.view(-1, logits.size(-1)), tokens.view(-1))
+                print("test loss shape: ", loss.shape)
+                print("test loss: ", loss.item())
                 if loss == None: continue
                 valloss = torch.cat([valloss, loss.unsqueeze(0)])
                 if batch == self.testing_steps:
