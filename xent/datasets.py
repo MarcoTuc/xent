@@ -84,7 +84,6 @@ class SynthProcessor(DataProcessor):
 
         self.dataset = self.load_pickled_dataset()
     
-    
     def load_pickled_dataset(self):
         data_files = [f for f in os.listdir(self._path) if f.endswith(".pkl")]
         if self.files_to_load: data_files = data_files[:self.files_to_load]

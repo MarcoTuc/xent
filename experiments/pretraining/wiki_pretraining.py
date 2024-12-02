@@ -14,9 +14,13 @@ from torch.amp import autocast, GradScaler
 import datasets
 from datasets import load_dataset
 
-from xent import M, T
+from xent import (
+    Model as M,
+    Trainer as T
+)
+
 from xent.datasets import SynthProcessor, DataProcessor
-from xent.utils import scalinglaws_lr_function, Tee
+from xent.utils import Tee
 from xent.config import *
 
 launched_on = datetime.now().strftime('%d-%b_%H:%M')
@@ -27,7 +31,7 @@ Pretraining of GPT2-XL on Wikipedia
 """
 
 use_wandb = True
-log_intxt = True
+log_intxt = False
 
 SEED = 21
 
@@ -40,12 +44,12 @@ model_base = "base"
 model_name = "gpt2-xl"
 model_version = "M0"
 new_model_base = "pretrained"
-new_model_version = "gpt2-xl-wikipedia"
+new_model_version = "gpt2-xl-wikipedia-local"
 
 # define the training loop
-batch_size = 32 #data per training step
-train_for = 100 #training steps in between each evaluation
-eval_for = 30 #eval steps in between each training loop -- 1200 random samples for each evaluation
+batch_size = 4 #data per training step
+train_for = 10 #training steps in between each evaluation
+eval_for = 5 #eval steps in between each training loop -- 1200 random samples for each evaluation
 sample_every = 500 #generate a sample every number of training steps
 eval_size = eval_for*batch_size #data samples in an eval
 
