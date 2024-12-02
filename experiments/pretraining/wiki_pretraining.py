@@ -27,7 +27,7 @@ Pretraining of GPT2-XL on Wikipedia
 """
 
 use_wandb = True
-log_intxt = False
+log_intxt = True
 
 SEED = 21
 
@@ -43,7 +43,7 @@ new_model_base = "pretrained"
 new_model_version = "gpt2-xl-wikipedia"
 
 # define the training loop
-batch_size = 4 #data per training step
+batch_size = 16 #data per training step
 train_for = 100 #training steps in between each evaluation
 eval_for = 30 #eval steps in between each training loop -- 1200 random samples for each evaluation
 sample_every = 500 #generate a sample every number of training steps
@@ -57,8 +57,8 @@ training_steps = 100000
 
 ##########################################################
 if log_intxt:
-    stdout_path = os.path.join(os.getenv("XENT_MODELS_PATH"), model_base, model_name, new_model_version, "console.txt")
-    tqdm_path = os.path.join(os.getenv("XENT_MODELS_PATH"), model_base, model_name, new_model_version, "tqdm.txt")
+    stdout_path = os.path.join(os.getenv("XENT_MODELS_PATH"), new_model_base, model_name, new_model_version, "console.txt")
+    tqdm_path = os.path.join(os.getenv("XENT_MODELS_PATH"), new_model_base, model_name, new_model_version, "tqdm.txt")
     os.makedirs(os.path.dirname(stdout_path), exist_ok=True)
     os.makedirs(os.path.dirname(tqdm_path), exist_ok=True)
     f = open(stdout_path, "w+")
@@ -92,7 +92,7 @@ class Wikichunk(Dataset):
     
     def __len__(self):
         return self.length
-    
+
     def __getitem__(self, idx):
         idx = torch.randint(0, self.length, (1,)).item()
         chunk = self.data[idx:idx+self.ctx]
