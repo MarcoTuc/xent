@@ -48,8 +48,11 @@ for split in splits:
         tensor_to_save = torch.LongTensor([]).to(device)
         dshard = finaldata[split].shard(num_shards=shards_to_save, index=sh)
         for el in tqdm(dshard, leave=False):
-            tensor_to_save = torch.cat([tensor_to_save, model.tokenize(el["text"]).input_ids], dim=-1)
-        
+            tensor_to_save = torch.cat([
+                tensor_to_save, 
+                model.tokenize(el["text"]).input_ids, 
+                torch.LongTensor([model.tokenizer.eos_token_id]).unsqueeze(0).to(device)
+                ], dim=-1)  
         save_dir = os.path.join(base_save_dir, split)
         save_name = f"{split}_{str(sh).zfill(4)}"
         DataProcessor.pickle_dump(

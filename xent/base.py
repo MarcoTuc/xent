@@ -89,20 +89,23 @@ class M():
             max_length=self.ctx_window
         ).to(device)
     
-    def detokenize(self, tokens, mode: Literal["single", "tensor", "list", "full_batch"]="tensor") -> str:
+    def detokenize(self, 
+                   tokens, 
+                   mode: Literal["single", "tensor", "list", "full_batch"]="tensor",
+                   skip_special=True) -> str:
         """ single and list mode work only on a single sample. batch is for multiple batches """
         modes = ["single", "tensor", "list", "full_batch"]
         if mode not in modes:
             raise ValueError(f"mode {mode} is not in available modalities: {', '.join(modes)}")
         if mode == "single":
-            return self.tokenizer.decode(tokens[0], skip_special_tokens=True)
+            return self.tokenizer.decode(tokens[0], skip_special_tokens=skip_special)
         elif mode == "tensor":
-            return self.tokenizer.decode(tokens, skip_special_tokens=True)
+            return self.tokenizer.decode(tokens, skip_special_tokens=skip_special)
         elif mode == "full_batch":
             #TODO check the behavior of batch mode
-            return self.tokenizer.batch_decode(tokens, skip_special_tokens=True)
+            return self.tokenizer.batch_decode(tokens, skip_special_tokens=skip_special)
         elif mode == "list":
-            return [self.tokenizer.decode([tok], skip_special_tokens=True) for tok in tokens[0]]
+            return [self.tokenizer.decode([tok], skip_special_tokens=skip_special) for tok in tokens[0]]
             
     def pad(self, tensor):
         if len(tensor.shape) == 1:
