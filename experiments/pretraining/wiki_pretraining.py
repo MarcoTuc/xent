@@ -43,7 +43,7 @@ new_model_base = "pretrained"
 new_model_version = "gpt2-xl-wikipedia"
 
 # define the training loop
-batch_size = 32 #data per training step
+batch_size = 4 #data per training step
 train_for = 100 #training steps in between each evaluation
 eval_for = 30 #eval steps in between each training loop -- 1200 random samples for each evaluation
 sample_every = 500 #generate a sample every number of training steps
@@ -77,7 +77,7 @@ train_set = SynthProcessor(
 
 test_set = SynthProcessor(
     base="wiki90-tok",
-    dataset_name="train"
+    dataset_name="test"
 ).dataset
 
 train_set_cpu = torch.cat(train_set, dim=-1).to("cpu")
@@ -136,6 +136,7 @@ saving_info = {
         "model": model_base,
         "model_version": model_version,
         "new_model": new_model_version,
+        "trained_for": training_steps,
         "message": message_in_a_bottle
     }
 
@@ -153,11 +154,10 @@ with autocast("cuda"):
     while True: 
         trainer.pre_train(
             saving_info=saving_info,
-            saving_options=saving_options
+            saving_options=saving_options,
+            steps=training_steps
         )
-        iter += 1
-        if iter == training_steps:
-            break
+        break
 
 if use_wandb: 
     wandb.finish()

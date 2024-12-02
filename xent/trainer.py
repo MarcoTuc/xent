@@ -163,12 +163,14 @@ class Trainer():
                 total_loss = self.empty_lossess
             self.train_checkpoint += 1
     
-    def pre_train(self, saving_options=None, tot_epochs=None, saving_info=None):
+    def pre_train(self, saving_options=None, saving_info=None, steps=None):
         """ Trains on a xent task and perform validation as well """
+        iter = 0
         self.M.model.train()
         sampling_loss = self.empty_lossess
         total_loss = self.empty_lossess
-        for batch, tokens in tqdm(enumerate(self.train_loader), desc=f"Training epoch {self.epoch+1}/{tot_epochs} || ", total=self.training_steps):
+        bar = tqdm(total=steps, desc="Training steps")
+        for batch, tokens in enumerate(self.train_loader):
             self.optimizer.zero_grad()        
             tokens = tokens.to(device)   
             logits = self.M.model(input_ids=tokens).logits
@@ -197,6 +199,9 @@ class Trainer():
                 self.evaluate_pretrain(saving_options=saving_options, saving_info=saving_info) # will also log the validation loss
                 total_loss = self.empty_lossess
             self.train_checkpoint += 1
+            bar.update(1)
+            iter += 1
+            if iter == steps: break
 
     def evaluate(self, saving_options=None, saving_info=None):
         tqdm.write("Evaluating the model... ")
