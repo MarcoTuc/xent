@@ -152,6 +152,98 @@ class Closure(Task):
             "xonly_bwd_f": out_xonly_bwd_f,
             "xent_rank_top": out_xent_rank
         }
+    
+    def generate_llama(
+            self,
+            get_sample: Callable,
+        ):
+
+        """ This is a special generator for the parallel_parallel generator script, see message string there """
+        
+        share = int(256)
+        rescaling = 4
+
+        corpus = get_sample() # get corpus of text from callable method
+        toks = self.M.tokenize(corpus).input_ids # get tokenized corpus
+        window = min(share, toks.shape[1])
+        toks = toks.unfold(1, window, window).squeeze(0)
+        
+        out_fwd_closure_i = torch.LongTensor([]).to(device)
+        out_fwd_closure_f = torch.LongTensor([]).to(device)
+        out_xonly_fwd_i = torch.LongTensor([]).to(device)
+        out_xonly_fwd_f = torch.LongTensor([]).to(device)
+        out_bwd_closure_i = torch.LongTensor([]).to(device)
+        out_bwd_closure_f = torch.LongTensor([]).to(device)
+        out_xonly_bwd_i = torch.LongTensor([]).to(device)
+        out_xonly_bwd_f = torch.LongTensor([]).to(device)
+
+        out_xent_rank = torch.LongTensor([]).to(device)
+        
+        for slice in toks:
+
+            slice = slice.unsqueeze(0)
+            logits = self.M.model(slice).logits
+            xent = F.cross_entropy(logits[:, :-1].view(-1, logits.shape[-1]), slice[:, 1:].view(-1), reduction="none")
+
+            # generate forward closure tasks
+            fwd_closure_toks_i = torch.cat([slice, self.fwd_closure_toks_i], dim=-1)
+            fwd_closure_toks_f = torch.cat([slice, self.fwd_closure_toks_f], dim=-1)
+            xonly_fwd_toks_i = torch.cat([slice, self.xonly_fwd_toks_i], dim=-1)
+            xonly_fwd_toks_f = torch.cat([slice, self.xonly_fwd_toks_f], dim=-1)
+            for tok, xnt in zip(slice[0, 1:], xent):
+                xentok_i = self.M.tokenize(f" {round(float(xnt))}").input_ids.to(device)
+                xentok_f = self.M.tokenize(f" {round(float(xnt)/rescaling)}").input_ids.to(device)
+                fwd_closure_toks_i = torch.cat([fwd_closure_toks_i, tok.view(1,1), self.colon, xentok_i, self.newline], dim=-1)
+                fwd_closure_toks_f = torch.cat([fwd_closure_toks_f, tok.view(1,1), self.colon, xentok_f, self.newline], dim=-1)
+                xonly_fwd_toks_i = torch.cat([xonly_fwd_toks_i, xentok_i, self.semicolon], dim=-1)
+                xonly_fwd_toks_f = torch.cat([xonly_fwd_toks_f, xentok_f, self.semicolon], dim=-1)
+            
+            # generate backward closure tasks
+            bwd_closure_toks_i = torch.cat([slice, self.bwd_closure_toks_i], dim=-1)
+            bwd_closure_toks_f = torch.cat([slice, self.bwd_closure_toks_f], dim=-1)
+            xonly_bwd_toks_i = torch.cat([slice, self.xonly_bwd_toks_i], dim=-1)
+            xonly_bwd_toks_f = torch.cat([slice, self.xonly_bwd_toks_f], dim=-1)
+            for tok, xnt in zip(slice[0, 1:].flip(0), xent.flip(0)):
+                xentok_i = self.M.tokenize(f" {round(float(xnt))}").input_ids.to(device)
+                xentok_f = self.M.tokenize(f" {round(float(xnt)/rescaling)}").input_ids.to(device)
+                bwd_closure_toks_i = torch.cat([bwd_closure_toks_i, tok.view(1,1), self.colon, xentok_i, self.newline], dim=-1)
+                bwd_closure_toks_f = torch.cat([bwd_closure_toks_f, tok.view(1,1), self.colon, xentok_f, self.newline], dim=-1)
+                xonly_bwd_toks_i = torch.cat([xonly_bwd_toks_i, xentok_i, self.semicolon], dim=-1)
+                xonly_bwd_toks_f = torch.cat([xonly_bwd_toks_f, xentok_f, self.semicolon], dim=-1)
+
+            # generate ranking tasks
+            xent_rank_toks = torch.cat([slice, self.rank_task], dim=-1)
+            ranked_xents, sorting = torch.sort(xent, descending=True)
+            sorted_toks = toks[0, 1:][sorting]
+            task_toks = torch.cat([
+                sorted_toks.view(sorted_toks.shape[0], 1),
+                # torch.cat([self.M.tokenize(f" {round(float(x)/rescaling)}").input_ids for x in ranked_xents]), # uncomment if you also want to put xent in the output task
+                self.semicolon.squeeze(0).repeat(sorted_toks.shape[0], 1)
+            ], dim = 1)
+            xent_rank_toks = torch.cat([xent_rank_toks, task_toks.view(1,-1)], dim=-1)
+
+            # stack everything for return
+            out_fwd_closure_i = torch.cat([out_fwd_closure_i, self.M.pad(fwd_closure_toks_i)])
+            out_fwd_closure_f = torch.cat([out_fwd_closure_f, self.M.pad(fwd_closure_toks_f)])
+            out_xonly_fwd_i = torch.cat([out_xonly_fwd_i, self.M.pad(xonly_fwd_toks_i)])
+            out_xonly_fwd_f = torch.cat([out_xonly_fwd_f, self.M.pad(xonly_fwd_toks_f)])
+            out_bwd_closure_i = torch.cat([out_bwd_closure_i, self.M.pad(bwd_closure_toks_i)])
+            out_bwd_closure_f = torch.cat([out_bwd_closure_f, self.M.pad(bwd_closure_toks_f)])
+            out_xonly_bwd_i = torch.cat([out_xonly_bwd_i, self.M.pad(xonly_bwd_toks_i)])
+            out_xonly_bwd_f = torch.cat([out_xonly_bwd_f, self.M.pad(xonly_bwd_toks_f)])
+            out_xent_rank = torch.cat([out_xent_rank, self.M.pad(xent_rank_toks)])
+
+        return {
+            "fwd_closure_i": out_fwd_closure_i,
+            "fwd_closure_f": out_fwd_closure_f,
+            "xonly_fwd_i": out_xonly_fwd_i,
+            "xonly_fwd_f": out_xonly_fwd_f,
+            "bwd_closure_i": out_bwd_closure_i,
+            "bwd_closure_f": out_bwd_closure_f,
+            "xonly_bwd_i": out_xonly_bwd_i,
+            "xonly_bwd_f": out_xonly_bwd_f,
+            "xent_rank_top": out_xent_rank
+        }
 
     def generate(
             self,

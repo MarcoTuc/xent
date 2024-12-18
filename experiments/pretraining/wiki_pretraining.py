@@ -27,7 +27,7 @@ Pretraining of GPT2-XL on Wikipedia
 """
 
 use_wandb = True
-log_intxt = False
+log_intxt = True    
 
 SEED = 21
 
@@ -40,17 +40,17 @@ model_base = "base"
 model_name = "gpt2-xl"
 model_version = "M0"
 new_model_base = "pretrained"
-new_model_version = "gpt2-xl-wikipedia-local"
+new_model_version = "gpt2-xl-wikipedia-6e-6"
 
 # define the training loop
-batch_size = 4 #data per training step
-train_for = 10 #training steps in between each evaluation
-eval_for = 5 #eval steps in between each training loop -- 1200 random samples for each evaluation
+batch_size = 32 #data per training step
+train_for = 100 #training steps in between each evaluation
+eval_for = 50 #eval steps in between each training loop
 sample_every = 500 #generate a sample every number of training steps
 eval_size = eval_for*batch_size #data samples in an eval
 
 # define the optimization
-learning_rate = 6e-4
+learning_rate = 6e-6
 warmup_steps = 5000 #very simple linear warmup
 
 training_steps = 100000

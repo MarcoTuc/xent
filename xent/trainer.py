@@ -174,11 +174,10 @@ class Trainer():
             tokens = tokens.to(device)   
             logits = self.M.model(input_ids=tokens).logits
             loss = self.crossentropy(logits.view(-1, logits.size(-1)), tokens.view(-1))
-            print("train loss shape:", loss.shape)
-            print("train loss:", loss.item())
             loss.backward()
             clip_grad_norm_(self.M.model.parameters(), self.grad_clip)
             self.optimizer.step()
+            total_loss = torch.cat([total_loss, loss.unsqueeze(0)])
             if self._do_schedule: 
                 wandb.log({"learning_rate": self.scheduler.get_last_lr()[0]})
                 self.scheduler.step()
@@ -223,8 +222,6 @@ class Trainer():
                 tokens = tokens.to(device)
                 logits = self.M.model(input_ids=tokens).logits
                 loss = self.crossentropy(logits.view(-1, logits.size(-1)), tokens.view(-1))
-                print("test loss shape: ", loss.shape)
-                print("test loss: ", loss.item())
                 if loss == None: continue
                 valloss = torch.cat([valloss, loss.unsqueeze(0)])
                 if batch == self.testing_steps:
