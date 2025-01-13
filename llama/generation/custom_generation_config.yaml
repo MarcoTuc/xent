@@ -1,0 +1,44 @@
+# Config for running the InferenceRecipe in generate.py to generate output from an LLM
+#
+# To launch, run the following command from root torchtune directory:
+#    tune run generate --config generation
+
+# Model arguments
+model:
+  _component_: torchtune.models.llama3_2.lora_llama3_2_3b
+
+checkpointer:
+  _component_: torchtune.training.FullModelHFCheckpointer
+  checkpoint_dir: /rcp/marco/models/llama-3.2-3B-Instruct/closure-finetuned/checkpoints
+  checkpoint_files:
+  - hf_model_0001_0.pt
+  - hf_model_0002_0.pt
+  recipe_checkpoint: null
+  output_dir: /rcp/marco/models/llama-3.2-3B-Instruct/closure-finetuned/checkpoints
+  model_type: LLAMA3_2
+resume_from_checkpoint: false
+save_adapter_weights_only: false
+
+device: cuda
+dtype: bf16
+
+seed: 1234
+
+# Tokenizer arguments
+tokenizer:
+  _component_: torchtune.models.llama3.llama3_tokenizer
+  path: /rcp/marco/models/base/llama-3.2-3B-Instruct/original/tokenizer.model
+  max_seq_len: null
+  prompt_template: null
+
+# Generation arguments; defaults taken from gpt-fast
+prompt:
+  system: null
+  user: "What's the cross-entropy of the next word?"
+max_new_tokens: 300
+temperature: 0.6 # 0.8 and 0.6 are popular values to try
+top_k: 300
+
+enable_kv_cache: True
+
+quantizer: null

@@ -9,7 +9,7 @@ from xent import X
 from xent.config import *
 
 # definition of the device
-device = "cuda:0"
+device = "cuda:3"
 
 # initialize model and tokenizer
 model, tokenizer = FastLanguageModel.from_pretrained(
@@ -21,7 +21,7 @@ data = load_dataset(
     "wikipedia", 
     "20220301.en", 
     trust_remote_code=True,
-    )["train"].shard(100, 1)
+    )["train"].shard(100, 51)
 
 # here's a simple tokenizer wrapper to not repeat arguments all around
 def tokenize(text, add_bos=False, **kwargs):
@@ -40,8 +40,8 @@ def save_checkpoint(dataset, dataset_dir, checkpoint_num):
 
 # make the directory where we'll be saving data checkpoints
 output_dir = os.path.join(data_dir, "instruct_llama")
-closure_dir = os.path.join(output_dir, "closure")
-ranking_dir = os.path.join(output_dir, "ranking")
+closure_dir = os.path.join(output_dir, "closure-test")
+ranking_dir = os.path.join(output_dir, "ranking-test")
 os.makedirs(output_dir, exist_ok=True)
 os.makedirs(closure_dir, exist_ok=True)
 os.makedirs(ranking_dir, exist_ok=True)
