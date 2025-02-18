@@ -5,6 +5,7 @@
 __pycache__
 wandb
 menv
+env
 storage
 data
 models

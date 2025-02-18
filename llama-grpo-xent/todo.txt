@@ -1,0 +1,2 @@
+- Reduce memory usage
+- Remove the xent-function entirely, it is useless and it only confuses the model
