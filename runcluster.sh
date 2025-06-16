@@ -18,7 +18,7 @@ runai submit \
     --image registry.rcp.epfl.ch/tuccio/$tag \
     --node-pools h100 \
     --gpu 1 \
-    --environment WANDB_API_KEY=e37d5bd5c2f36a7a6b7eb1c2501056a9884b4db2 \
+    --environment WANDB_API_KEY=KEY \
     --run-as-uid 396376  \
     --run-as-gid 10776 \
     --existing-pvc claimname=csft-scratch,path=/home/marktas/storage \
