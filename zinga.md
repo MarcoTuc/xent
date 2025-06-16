@@ -1,1 +1,0 @@
-detach saving module from trainer module and make it something itself
